@@ -1,0 +1,397 @@
+/* src/index.css - DISEÑO ART MARY AUTÉNTICO */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700;800&display=swap');
+
+/* Variables CSS basadas en el logo rosado de Art Mary */
+:root {
+  /* Colores principales rosados/coral (basados en el logo) */
+  --primary-50: #fdf2f8;
+  --primary-100: #fce7f3;
+  --primary-200: #fbcfe8;
+  --primary-300: #f9a8d4;
+  --primary-400: #f472b6;
+  --primary-500: #ec4899;
+  --primary-600: #db2777;
+  --primary-700: #be185d;
+  --primary-800: #9d174d;
+  --primary-900: #831843;
+
+  /* Colores secundarios (rosas más suaves) */
+  --secondary-50: #fef7f7;
+  --secondary-100: #feecec;
+  --secondary-200: #fecaca;
+  --secondary-300: #fca5a5;
+  --secondary-400: #f87171;
+  --secondary-500: #ef4444;
+  --secondary-600: #dc2626;
+  --secondary-700: #b91c1c;
+  --secondary-800: #991b1b;
+  --secondary-900: #7f1d1d;
+
+  /* Colores de acento (cremas/beiges del logo) */
+  --accent-50: #fffbf5;
+  --accent-100: #fef7ed;
+  --accent-200: #fdebd5;
+  --accent-300: #fbd4aa;
+  --accent-400: #f7b774;
+  --accent-500: #f29c4c;
+  --accent-600: #ee7d1f;
+  --accent-700: #df5f15;
+  --accent-800: #b94713;
+  --accent-900: #792f16;
+
+  /* Colores neutros cálidos */
+  --neutral-50: #fafaf9;
+  --neutral-100: #f5f5f4;
+  --neutral-200: #e7e5e4;
+  --neutral-300: #d6d3d1;
+  --neutral-400: #a8a29e;
+  --neutral-500: #78716c;
+  --neutral-600: #57534e;
+  --neutral-700: #44403c;
+  --neutral-800: #292524;
+  --neutral-900: #1c1917;
+
+  /* Colores funcionales */
+  --success-500: #10b981;
+  --success-600: #059669;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  --error-500: #ef4444;
+  --error-600: #dc2626;
+
+  /* Gradientes rosados de Art Mary */
+  --gradient-primary: linear-gradient(135deg, #ec4899 0%, #f472b6 50%, #f9a8d4 100%);
+  --gradient-secondary: linear-gradient(135deg, #be185d 0%, #ec4899 50%, #f472b6 100%);
+  --gradient-accent: linear-gradient(135deg, #f9a8d4 0%, #fbcfe8 50%, #fdf2f8 100%);
+  --gradient-warm: linear-gradient(135deg, #fffbf5 0%, #fef7ed 50%, #fdebd5 100%);
+  --gradient-background: linear-gradient(135deg, #fdf2f8 0%, #fffbf5 50%, #fef7f7 100%);
+
+  /* Sombras rosadas suaves */
+  --shadow-xs: 0 1px 2px 0 rgba(236, 72, 153, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(236, 72, 153, 0.1), 0 1px 2px -1px rgba(236, 72, 153, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(236, 72, 153, 0.1), 0 2px 4px -2px rgba(236, 72, 153, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(236, 72, 153, 0.1), 0 4px 6px -4px rgba(236, 72, 153, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(236, 72, 153, 0.1), 0 8px 10px -6px rgba(236, 72, 153, 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgba(236, 72, 153, 0.25);
+  --shadow-warm: 0 0 20px rgba(236, 72, 153, 0.2);
+
+  /* Tipografía */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Playfair Display', Georgia, serif;
+
+  /* Bordes y espaciado */
+  --border-radius-sm: 0.375rem;
+  --border-radius-md: 0.5rem;
+  --border-radius-lg: 0.75rem;
+  --border-radius-xl: 1rem;
+  --border-radius-2xl: 1.5rem;
+  --border-radius-full: 9999px;
+
+  /* Transiciones */
+  --transition-fast: 150ms ease-in-out;
+  --transition-normal: 300ms ease-in-out;
+  --transition-slow: 500ms ease-in-out;
+}
+
+/* Reset y base */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--gradient-background);
+  color: var(--neutral-700);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+/* Scrollbar personalizada con colores de Art Mary */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--accent-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gradient-primary);
+  border-radius: var(--border-radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-600);
+}
+
+/* Elementos base */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tipografía con estilo Art Mary */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  color: var(--neutral-800);
+}
+
+h1 {
+  font-size: 3.75rem;
+  font-weight: 800;
+}
+
+h2 {
+  font-size: 3rem;
+  font-weight: 700;
+}
+
+h3 {
+  font-size: 2.25rem;
+  font-weight: 600;
+}
+
+p {
+  color: var(--neutral-600);
+  line-height: 1.7;
+}
+
+/* Enlaces */
+a {
+  color: var(--primary-600);
+  text-decoration: none;
+  transition: var(--transition-fast);
+  font-weight: 500;
+}
+
+a:hover {
+  color: var(--primary-700);
+}
+
+/* Botones con estilo Art Mary */
+button {
+  font-family: inherit;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--border-radius-lg);
+  cursor: pointer;
+  transition: var(--transition-normal);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Clases de botones Art Mary */
+.btn-primary {
+  background: var(--gradient-primary);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid transparent;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--neutral-700);
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--neutral-300);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--accent-50);
+  border-color: var(--primary-300);
+  transform: translateY(-1px);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  box-shadow: var(--shadow-md);
+}
+
+.btn-danger {
+  background: var(--gradient-secondary);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  box-shadow: var(--shadow-md);
+}
+
+/* Inputs y formularios */
+input, textarea, select {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--neutral-300);
+  border-radius: var(--border-radius-lg);
+  background: white;
+  color: var(--neutral-800);
+  transition: var(--transition-fast);
+  outline: none;
+  width: 100%;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px rgba(238, 125, 31, 0.1);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--neutral-400);
+}
+
+/* Cards con estilo Art Mary */
+.card {
+  background: white;
+  border-radius: var(--border-radius-xl);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--neutral-200);
+  transition: var(--transition-normal);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.card-warm {
+  background: var(--gradient-warm);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--accent-200);
+  box-shadow: var(--shadow-xl);
+}
+
+/* Contenedores */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* Utilidades de colores Art Mary */
+.text-primary { color: var(--primary-600); }
+.text-secondary { color: var(--neutral-600); }
+.text-success { color: var(--success-500); }
+.text-danger { color: var(--error-500); }
+.text-warm { color: var(--accent-700); }
+
+.bg-primary { background: var(--gradient-primary); }
+.bg-secondary { background: var(--gradient-secondary); }
+.bg-warm { background: var(--gradient-warm); }
+
+/* Efectos especiales Art Mary */
+.warm-glass {
+  background: rgba(254, 253, 248, 0.8);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.gradient-text-primary {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hover-lift-warm {
+  transition: var(--transition-normal);
+}
+
+.hover-lift-warm:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-warm);
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fadeIn { animation: fadeIn 0.6s ease-out; }
+.animate-slideIn { animation: slideIn 0.4s ease-out; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+
+/* Estados de carga */
+.loading-shimmer {
+  background: linear-gradient(90deg, var(--accent-100), var(--accent-200), var(--accent-100));
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  h1 { font-size: 2.5rem; }
+  h2 { font-size: 2rem; }
+  h3 { font-size: 1.75rem; }
+  
+  .container {
+    padding: 0 1rem;
+  }
+  
+  .card {
+    padding: 1rem;
+  }
+}
+
+/* Modo oscuro opcional */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --gradient-background: linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%);
+  }
+  
+  body {
+    background: var(--gradient-background);
+    color: var(--neutral-200);
+  }
+}
