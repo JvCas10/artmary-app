@@ -1,45 +1,26 @@
-# render.yaml - Configuración para desplegar en Render
 services:
   # Backend - API de Node.js
   - type: web
     name: tienda-backend
     env: node
+    plan: free
     buildCommand: cd backend && npm install
     startCommand: cd backend && node server.js
-    healthCheckPath: /api/productos
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
-      - key: MONGO_URI
-        fromDatabase:
-          name: tienda-db
-          property: connectionString
       - key: JWT_SECRET
         generateValue: true
-      - key: CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
-      - key: EMAIL_USER
-        sync: false
-      - key: EMAIL_PASS
-        sync: false
     
-  # Frontend - React/Vite
+  # Frontend - React/Vite  
   - type: web
     name: tienda-frontend
     env: static
+    plan: free
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_URL
         value: https://tienda-backend.onrender.com/api
-
-# Base de datos MongoDB
-databases:
-  - name: tienda-db
-    databaseName: tienda_online
