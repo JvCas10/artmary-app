@@ -15,12 +15,10 @@ services:
         generateValue: true
     
   # Frontend - React/Vite  
-  - type: web
+  - type: static
     name: tienda-frontend
-    env: static
-    plan: free
     buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
+    publishPath: ./dist
     envVars:
       - key: VITE_API_URL
         value: https://tienda-backend.onrender.com/api
