@@ -56,16 +56,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Función para iniciar sesión
-  // Asegúrate de que la función reciba 'contrasena' (sin ñ) del Login.jsx
-  // pero la envíe como 'contraseña' (con ñ) al backend.
-  const login = async (correo, contrasena) => { // <-- Recibe 'contrasena' (sin ñ)
+  const login = async (correo, contrasena) => {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ correo, contraseña: contrasena }) // <-- ¡CAMBIO CLAVE AQUÍ! Envía como 'contraseña' (con ñ)
+        body: JSON.stringify({ correo, contraseña: contrasena })
       });
 
       const data = await response.json();
@@ -76,7 +74,7 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         return { success: true, message: 'Inicio de sesión exitoso' };
       } else {
-        return { success: false, message: data.mensaje || 'Error al iniciar sesión' };
+        return { success: false, message: data.mensaje || 'Error al iniciar sesión', requiresVerification: data.requiresVerification };
       }
     } catch (error) {
       console.error('Error en login:', error);
