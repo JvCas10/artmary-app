@@ -48,7 +48,7 @@ function Catalogo() {
         ...filtrosAplicados
       });
 
-      const response = await axios.get(`http://localhost:5000/api/productos?${params}`, {
+      const response = await axios.get(`/productos?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }

@@ -31,7 +31,7 @@ function SolicitarRestablecimiento() {
         setEstado('cargando');
 
         try {
-            const response = await axios.post('http://localhost:5000/api/auth/solicitar-restablecimiento', {
+            const response = await axios.post('/auth/solicitar-restablecimiento', {
                 correo
             });
 
