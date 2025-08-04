@@ -31,9 +31,7 @@ function SolicitarRestablecimiento() {
         setEstado('cargando');
 
         try {
-            const response = await axios.post('/auth/solicitar-restablecimiento', {
-                correo
-            });
+            const response = await api.post('/auth/solicitar-restablecimiento', { correo });
 
             if (response.data.sent) {
                 setEstado('enviado');
@@ -41,9 +39,9 @@ function SolicitarRestablecimiento() {
             }
         } catch (error) {
             console.error('Error solicitando restablecimiento:', error);
-            
+
             const errorMsg = error.response?.data?.mensaje || 'Error al enviar la solicitud.';
-            
+
             if (error.response?.data?.requiresVerification) {
                 setEstado('formulario');
                 setMensaje('Tu cuenta necesita ser verificada primero. Revisa tu email para el enlace de verificación.');
@@ -94,7 +92,7 @@ function SolicitarRestablecimiento() {
                     <div style={logoContainerStyle}>
                         <img src={logo} alt="Art Mary Logo" style={logoImageStyle} />
                     </div>
-                    
+
                     <div style={headerStyle}>
                         <h1 style={titleStyle}>
                             <span style={titleIconStyle}>🔐</span>

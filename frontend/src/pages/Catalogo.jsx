@@ -52,7 +52,7 @@ function Catalogo() {
         sortBy: filtrosAplicados.sortBy || 'default'
       });
 
-      const response = await axios.get(`/productos?${params}`, {
+      const response = await api.get(`/productos?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }

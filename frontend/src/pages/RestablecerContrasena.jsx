@@ -54,7 +54,7 @@ function RestablecerContrasena() {
             if (response.data.success) {
                 setEstado('exito');
                 setMensaje(response.data.mensaje);
-                
+
                 // Redirigir al login después de 3 segundos
                 setTimeout(() => {
                     navigate('/login');
@@ -62,9 +62,9 @@ function RestablecerContrasena() {
             }
         } catch (error) {
             console.error('Error restableciendo contraseña:', error);
-            
+
             const errorMsg = error.response?.data?.mensaje || 'Error al restablecer la contraseña.';
-            
+
             if (error.response?.data?.expired) {
                 setEstado('error');
                 setMensaje('El enlace de restablecimiento ha expirado. Solicita uno nuevo.');
@@ -134,7 +134,7 @@ function RestablecerContrasena() {
                     <div style={logoContainerStyle}>
                         <img src={logo} alt="Art Mary Logo" style={logoImageStyle} />
                     </div>
-                    
+
                     <div style={headerStyle}>
                         <h1 style={titleStyle}>
                             <span style={titleIconStyle}>🔐</span>
@@ -192,18 +192,18 @@ function RestablecerContrasena() {
                             <div style={passwordStrengthStyle}>
                                 <div style={strengthLabelStyle}>Fortaleza de la contraseña:</div>
                                 <div style={strengthBarContainerStyle}>
-                                    <div 
+                                    <div
                                         style={{
                                             ...strengthBarStyle,
                                             width: `${Math.min((nuevaContrasena.length / 12) * 100, 100)}%`,
-                                            background: nuevaContrasena.length < 6 ? '#ef4444' : 
-                                                       nuevaContrasena.length < 8 ? '#f59e0b' : '#22c55e'
+                                            background: nuevaContrasena.length < 6 ? '#ef4444' :
+                                                nuevaContrasena.length < 8 ? '#f59e0b' : '#22c55e'
                                         }}
                                     ></div>
                                 </div>
                                 <div style={strengthTextStyle}>
-                                    {nuevaContrasena.length < 6 ? 'Débil' : 
-                                     nuevaContrasena.length < 8 ? 'Media' : 'Fuerte'}
+                                    {nuevaContrasena.length < 6 ? 'Débil' :
+                                        nuevaContrasena.length < 8 ? 'Media' : 'Fuerte'}
                                 </div>
                             </div>
                         )}
