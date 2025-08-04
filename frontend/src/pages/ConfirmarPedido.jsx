@@ -1,3 +1,4 @@
+import api from '../api/axios';
 import { useContext } from 'react';
 import { CartContext } from '../context/CartContext';
 import { useNavigate, Link } from 'react-router-dom'; // ✅ Agregado Link
@@ -20,21 +21,7 @@ function ConfirmarPedido() {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/pedidos/confirmar', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(carrito)
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(`Error: ${data.error || data.mensaje}`);
-        return;
-      }
+      const { data } = await api.post('/pedidos/confirmar', carrito);
 
       alert('¡Pedido confirmado con éxito! 🎉');
       vaciarCarrito();
@@ -55,7 +42,7 @@ function ConfirmarPedido() {
             Confirmación de Pedido
           </h1>
           <p style={heroSubtitleStyle}>
-            {carrito.length === 0 
+            {carrito.length === 0
               ? 'No tienes productos para confirmar'
               : `Revisa tu pedido de ${carrito.length} ${carrito.length === 1 ? 'producto' : 'productos'}`
             }
@@ -87,8 +74,8 @@ function ConfirmarPedido() {
             </div>
             <div style={emptyDecorationsStyle}>
               <div style={floatingIconStyle}>✨</div>
-              <div style={{...floatingIconStyle, ...floatingIcon2Style}}>🎨</div>
-              <div style={{...floatingIconStyle, ...floatingIcon3Style}}>💝</div>
+              <div style={{ ...floatingIconStyle, ...floatingIcon2Style }}>🎨</div>
+              <div style={{ ...floatingIconStyle, ...floatingIcon3Style }}>💝</div>
             </div>
           </div>
         ) : (
@@ -99,7 +86,7 @@ function ConfirmarPedido() {
                 <span style={sectionIconStyle}>📋</span>
                 Resumen del Pedido
               </h2>
-              
+
               <div style={productListStyle}>
                 {carrito.map((producto, index) => (
                   <div key={producto._id} style={{
@@ -119,7 +106,7 @@ function ConfirmarPedido() {
                         {producto.cantidad}
                       </div>
                     </div>
-                    
+
                     <div style={productInfoStyle}>
                       <h4 style={productNameStyle}>{producto.nombre}</h4>
                       <p style={productPriceStyle}>Q{producto.precioVenta.toFixed(2)} c/u</p>
@@ -154,7 +141,7 @@ function ConfirmarPedido() {
                   <span style={buttonIconStyle}>✅</span>
                   Confirmar Pedido
                 </button>
-                
+
                 <Link to="/carrito" style={editCartButtonStyle}>
                   <span style={buttonIconStyle}>✏️</span>
                   Editar Carrito
