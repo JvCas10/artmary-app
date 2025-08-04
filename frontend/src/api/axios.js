@@ -1,34 +1,37 @@
 // src/api/axios.js
 import axios from 'axios';
 
-// URL base que funciona tanto en desarrollo como en producción
+// URL base en prod/desarrollo
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// Interceptor para requests - añadir token automáticamente
-instance.interceptors.request.use(
+// Crea la instancia (llamémosla "api" para evitar confusiones)
+const api = axios.create({
+  baseURL,
+  timeout: 10000,
+});
+
+// Interceptor de request: token + FormData sin forzar Content-Type
+api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+
+    // Si enviamos FormData, dejamos que axios ponga el boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Interceptor para responses - manejar errores globalmente
-instance.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+// Interceptor de response: 401 → limpiar y redirigir
+api.interceptors.response.use(
+  (res) => res,
   (error) => {
-    // Si el token expiró o es inválido, redirigir al login
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      // Solo redirigir si no estamos ya en la página de login
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+      if (!['/login', '/'].includes(window.location.pathname)) {
         window.location.href = '/login';
       }
     }
@@ -36,4 +39,4 @@ instance.interceptors.response.use(
   }
 );
 
-export default instance;
+export default api;
