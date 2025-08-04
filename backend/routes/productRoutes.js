@@ -18,7 +18,7 @@ router.get('/todos', authMiddleware, adminMiddleware, async (req, res, next) => 
 });
 
 // GET /api/productos - Obtener productos con filtros/paginación
-router.get('/', productController.obtenerProductos);
+router.get('/', authMiddleware, productController.obtenerProductos);
 
 // GET /api/productos/:id - Obtener un producto por ID
 router.get('/:id', productController.obtenerProductoPorId);
