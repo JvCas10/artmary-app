@@ -1,22 +1,21 @@
 // src/api/axios.js
 import axios from 'axios';
 
-// URL base en prod/desarrollo
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// Crea la instancia (llamémosla "api" para evitar confusiones)
+// Instancia única
 const api = axios.create({
   baseURL,
   timeout: 10000,
 });
 
-// Interceptor de request: token + FormData sin forzar Content-Type
+// Interceptor de request: token + FormData
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
 
-    // Si enviamos FormData, dejamos que axios ponga el boundary
+    // Si es FormData, NO forzar Content-Type
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
@@ -25,7 +24,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interceptor de response: 401 → limpiar y redirigir
+// Interceptor de response: manejar 401
 api.interceptors.response.use(
   (res) => res,
   (error) => {
