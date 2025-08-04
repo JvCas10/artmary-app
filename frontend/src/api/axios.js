@@ -4,15 +4,6 @@ import axios from 'axios';
 // URL base que funciona tanto en desarrollo como en producción
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// Crear una instancia de axios con configuración base
-const instance = axios.create({
-  baseURL: baseURL,
-  timeout: 10000, // Timeout de 10 segundos
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
 // Interceptor para requests - añadir token automáticamente
 instance.interceptors.request.use(
   (config) => {
