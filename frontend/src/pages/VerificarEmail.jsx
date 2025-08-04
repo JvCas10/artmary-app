@@ -1,7 +1,7 @@
 // src/pages/VerificarEmail.jsx
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 
 function VerificarEmail() {
     const [searchParams] = useSearchParams();
@@ -22,7 +22,7 @@ function VerificarEmail() {
             }
 
             try {
-                const response = await axios.get(`http://localhost:5000/api/auth/verificar-email?token=${token}`);
+                const response = await api.get(`/auth/verificar-email?token=${token}`);
 
                 if (response.data.verified) {
                     setEstado('exito');

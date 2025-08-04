@@ -1,6 +1,6 @@
 // src/pages/Catalogo.jsx - DISEÑO MODERNO PREMIUM
 import { useEffect, useState, useContext } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { CartContext } from '../context/CartContext';
 import { Link } from 'react-router-dom';
 import Pagination from '../components/Pagination';

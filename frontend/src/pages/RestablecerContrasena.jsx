@@ -1,7 +1,7 @@
 // src/pages/RestablecerContrasena.jsx
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import logo from '../assets/artmary-logo.png';
 
 function RestablecerContrasena() {
@@ -49,9 +49,7 @@ function RestablecerContrasena() {
         setEstado('cargando');
 
         try {
-            const response = await axios.post(`http://localhost:5000/api/auth/restablecer-contrasena?token=${token}`, {
-                nuevaContrasena
-            });
+            const response = await api.post(`/auth/restablecer-contrasena?token=${token}`, { nuevaContrasena });
 
             if (response.data.success) {
                 setEstado('exito');

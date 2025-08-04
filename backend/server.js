@@ -1,76 +1,91 @@
+// server.js (versión endurecida)
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config(); // Cargar variables de entorno
-const multer = require('multer'); // Para capturar errores específicos de subida
-
-// Verifica que Cloudinary esté cargando correctamente
-console.log('Cargando CLOUDINARY_API_SECRET:', process.env.CLOUDINARY_API_SECRET);
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const compression = require('compression');
+const morgan = require('morgan');
+require('dotenv').config();
 
 const app = express();
 
-// 🧠 Middleware para parsear el cuerpo de las solicitudes
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cors());
+// --- Seguridad básica
+app.disable('x-powered-by');
+app.use(helmet());
+app.use(compression());
 
-// 🛢️ Conexión a MongoDB Atlas
-const uri = process.env.MONGO_URI;
-if (uri) {
-  mongoose.connect(uri)
-    .then(() => console.log('📦 Conectado a MongoDB Atlas'))
-    .catch(err => console.error('❌ Error en la conexión a MongoDB', err));
-} else {
-  console.log('⚠️ MONGO_URI no está definida. Sin conexión a base de datos.');
+// Logs en desarrollo
+if (process.env.NODE_ENV !== 'production') {
+  app.use(morgan('dev'));
 }
 
-// 📡 Ruta básica para verificar conexión
-app.get('/', (req, res) => {
-  res.send('✅ API funcionando correctamente');
+// Límites de body
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// CORS estricto usando FRONTEND_URL
+const ALLOWED_ORIGINS = [process.env.FRONTEND_URL].filter(Boolean);
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    return cb(new Error('Origen no permitido por CORS'));
+  },
+  credentials: true,
+}));
+
+// Rate limiting global
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500, // ajusta según tu tráfico
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
+
+// --- DB
+const uri = process.env.MONGO_URI;
+if (!uri) {
+  console.error('MONGO_URI no está definida');
+  process.exit(1);
+}
+mongoose.connect(uri)
+  .then(() => console.log('📦 Conectado a MongoDB Atlas'))
+  .catch(err => {
+    console.error('❌ Error en la conexión a MongoDB', err);
+    process.exit(1);
+  });
+
+// Healthcheck
+app.get('/health', (req, res) => res.json({ ok: true }));
+
+// Rutas
+app.get('/', (req, res) => res.send('✅ API funcionando correctamente'));
+
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/productos', require('./routes/productRoutes'));
+app.use('/api/pedidos', require('./routes/orderRoutes'));
+app.use('/api/ventas', require('./routes/salesRoutes'));
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Ruta no encontrada' });
 });
 
-// 📁 Importar rutas
-const authRoutes = require('./routes/authRoutes');
-const productRoutes = require('./routes/productRoutes');
-const orderRoutes = require('./routes/orderRoutes');
-const salesRoutes = require('./routes/salesRoutes'); // 🆕 Ruta para ventas físicas
-
-// 🚏 Usar rutas
-app.use('/api/auth', authRoutes);
-app.use('/api/productos', productRoutes);  // productos
-app.use('/api/pedidos', orderRoutes);      // pedidos online
-app.use('/api/ventas', salesRoutes);       // ventas físicas desde el POS
-
-// 🛡️ Middleware de manejo de errores (debe ir al final)
+// Error handler (incluye Multer si usas uploads)
 app.use((err, req, res, next) => {
   console.error('--- ERROR GLOBAL DETECTADO ---');
-  console.error('Error:', err.message);
+  console.error(err);
 
-  if (err.stack) {
-    console.error('Stack:', err.stack);
-  }
-
-  if (err instanceof multer.MulterError) {
-    return res.status(400).json({
-      error: 'Error de subida de archivo (Multer)',
-      message: err.message
-    });
-  }
-
-  if (err.statusCode) {
-    return res.status(err.statusCode).json({
-      error: err.message
-    });
-  }
-
-  res.status(500).json({
-    error: 'Error interno del servidor',
-    message: err.message || 'Algo salió mal en el servidor.'
+  const status = err.statusCode || 500;
+  res.status(status).json({
+    error: status === 500 ? 'Error interno del servidor' : err.message,
+    message: process.env.NODE_ENV === 'production' ? undefined : err.message,
   });
 });
 
-// 🚀 Arrancar servidor
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+// Graceful shutdown
+const server = app.listen(process.env.PORT || 5000, () => {
+  console.log(`🚀 Servidor en http://localhost:${process.env.PORT || 5000}`);
 });
+process.on('SIGINT', () => { server.close(() => process.exit(0)); });
+process.on('SIGTERM', () => { server.close(() => process.exit(0)); });
