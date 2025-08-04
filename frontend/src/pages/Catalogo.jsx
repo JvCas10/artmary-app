@@ -45,7 +45,11 @@ function Catalogo() {
         page: page.toString(),
         limit: '12',
         search: search,
-        ...filtrosAplicados
+        categoria: filtrosAplicados.categoria || '',
+        precioMin: filtrosAplicados.precioMin || '',
+        precioMax: filtrosAplicados.precioMax || '',
+        disponibilidad: filtrosAplicados.disponibilidad || '',
+        sortBy: filtrosAplicados.sortBy || 'default'
       });
 
       const response = await axios.get(`/productos?${params}`, {
