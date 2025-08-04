@@ -2,23 +2,23 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const compression = require('compression');
-const morgan = require('morgan');
+//const helmet = require('helmet');
+//const rateLimit = require('express-rate-limit');
+//const compression = require('compression');
+//const morgan = require('morgan');
 require('dotenv').config();
 
 const app = express();
 
 // --- Seguridad básica
 app.disable('x-powered-by');
-app.use(helmet());
-app.use(compression());
+//app.use(helmet());
+//app.use(compression());
 
 // Logs en desarrollo
-if (process.env.NODE_ENV !== 'production') {
-  app.use(morgan('dev'));
-}
+//if (process.env.NODE_ENV !== 'production') {
+//  app.use(morgan('dev'));
+//}
 
 // Límites de body
 app.use(express.json({ limit: '1mb' }));
@@ -35,12 +35,12 @@ app.use(cors({
 }));
 
 // Rate limiting global
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 500, // ajusta según tu tráfico
-  standardHeaders: true,
-  legacyHeaders: false,
-}));
+//app.use(rateLimit({
+//  windowMs: 15 * 60 * 1000,
+//  max: 500, // ajusta según tu tráfico
+//  standardHeaders: true,
+//  legacyHeaders: false,
+//}));
 
 // --- DB
 const uri = process.env.MONGO_URI;
