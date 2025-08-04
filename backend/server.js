@@ -1,77 +1,84 @@
-// server.js (versión endurecida)
+// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-//const helmet = require('helmet');
-//const rateLimit = require('express-rate-limit');
-//const compression = require('compression');
-//const morgan = require('morgan');
 require('dotenv').config();
 
 const app = express();
 
-// --- Seguridad básica
+/* ========= Config básica ========= */
 app.disable('x-powered-by');
-//app.use(helmet());
-//app.use(compression());
 
-// Logs en desarrollo
-//if (process.env.NODE_ENV !== 'production') {
-//  app.use(morgan('dev'));
-//}
-
-// Límites de body
+// Body parsers (ajusta si necesitas subir archivos grandes)
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// CORS estricto usando FRONTEND_URL
-const ALLOWED_ORIGINS = [process.env.FRONTEND_URL].filter(Boolean);
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-    return cb(new Error('Origen no permitido por CORS'));
+/* ========= CORS (whitelist por env) =========
+   Define en Render (backend → Environment):
+   - FRONTEND_URL = https://artmary-frontend.onrender.com
+   - FRONTEND_URL_2 = https://tu-dominio-personalizado.com   (opcional)
+*/
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_2,
+  'http://localhost:5173', // Vite dev
+  'http://localhost:3000', // React dev (opcional)
+].filter(Boolean);
+
+const corsOptions = {
+  origin(origin, cb) {
+    // Permite requests sin Origin (health checks, curl) y orígenes en whitelist
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('CORS: origen no permitido'));
   },
   credentials: true,
-}));
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204,
+};
 
-// Rate limiting global
-//app.use(rateLimit({
-//  windowMs: 15 * 60 * 1000,
-//  max: 500, // ajusta según tu tráfico
-//  standardHeaders: true,
-//  legacyHeaders: false,
-//}));
+app.use(cors(corsOptions));
+// Ayuda a proxies/CDN a variar por Origin
+app.use((req, res, next) => {
+  res.header('Vary', 'Origin');
+  next();
+});
+// Preflight explícito
+app.options('*', cors(corsOptions));
 
-// --- DB
+/* ========= Base de datos ========= */
 const uri = process.env.MONGO_URI;
 if (!uri) {
-  console.error('MONGO_URI no está definida');
+  console.error('❌ MONGO_URI no está definida');
   process.exit(1);
 }
-mongoose.connect(uri)
+
+mongoose
+  .connect(uri)
   .then(() => console.log('📦 Conectado a MongoDB Atlas'))
-  .catch(err => {
-    console.error('❌ Error en la conexión a MongoDB', err);
+  .catch((err) => {
+    console.error('❌ Error en la conexión a MongoDB:', err?.message || err);
     process.exit(1);
   });
 
-// Healthcheck
+/* ========= Rutas ========= */
 app.get('/health', (req, res) => res.json({ ok: true }));
 
-// Rutas
-app.get('/', (req, res) => res.send('✅ API funcionando correctamente'));
+app.get('/', (req, res) => {
+  res.send('✅ API funcionando correctamente');
+});
 
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/productos', require('./routes/productRoutes'));
 app.use('/api/pedidos', require('./routes/orderRoutes'));
 app.use('/api/ventas', require('./routes/salesRoutes'));
 
-// 404 handler
+/* ========= 404 ========= */
 app.use((req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada' });
 });
 
-// Error handler (incluye Multer si usas uploads)
+/* ========= Manejador global de errores ========= */
 app.use((err, req, res, next) => {
   console.error('--- ERROR GLOBAL DETECTADO ---');
   console.error(err);
@@ -79,13 +86,21 @@ app.use((err, req, res, next) => {
   const status = err.statusCode || 500;
   res.status(status).json({
     error: status === 500 ? 'Error interno del servidor' : err.message,
+    // en prod no exponemos detalles
     message: process.env.NODE_ENV === 'production' ? undefined : err.message,
   });
 });
 
-// Graceful shutdown
-const server = app.listen(process.env.PORT || 5000, () => {
-  console.log(`🚀 Servidor en http://localhost:${process.env.PORT || 5000}`);
+/* ========= Inicio del servidor ========= */
+const PORT = process.env.PORT || 5000;
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Servidor en http://localhost:${PORT}`);
 });
-process.on('SIGINT', () => { server.close(() => process.exit(0)); });
-process.on('SIGTERM', () => { server.close(() => process.exit(0)); });
+
+/* ========= Graceful shutdown ========= */
+process.on('SIGINT', () => {
+  server.close(() => process.exit(0));
+});
+process.on('SIGTERM', () => {
+  server.close(() => process.exit(0));
+});
