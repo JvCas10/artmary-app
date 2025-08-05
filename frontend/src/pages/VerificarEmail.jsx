@@ -1,4 +1,4 @@
-// src/pages/VerificarEmail.jsx
+// src/pages/VerificarEmail.jsx - VERSIÓN COMPLETA
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
@@ -42,7 +42,7 @@ function VerificarEmail() {
                     setMensaje('El enlace de verificación ha expirado.');
                 } else if (errorMsg.toLowerCase().includes('inválido')) {
                     setEstado('error');
-                    setMensaje('Este enlace ya fue usado o no es válido. Si ya verificaste tu cuenta, puedes iniciar sesión normalmente.');
+                    setMensaje('Este enlace ya fue usado o no es válido.');
                 } else {
                     setEstado('error');
                     setMensaje(errorMsg || 'Error al verificar el email.');
@@ -54,10 +54,6 @@ function VerificarEmail() {
 
         verificarToken();
     }, [searchParams, navigate]);
-
-    const handleReenviarVerificacion = () => {
-        navigate('/login');
-    };
 
     if (loading) {
         return (
@@ -98,24 +94,10 @@ function VerificarEmail() {
                         <div style={errorIconStyle}>❌</div>
                         <h1 style={errorTitleStyle}>Error de Verificación</h1>
                         <p style={errorMessageStyle}>{mensaje}</p>
-                        <div style={errorDetailsStyle}>
-                            <p>Posibles causas:</p>
-                            <ul>
-                                <li>El enlace está malformado</li>
-                                <li>El token no es válido</li>
-                                <li>Ya se verificó anteriormente</li>
-                            </ul>
-                        </div>
-                        <div style={actionButtonsStyle}>
-                            <button onClick={handleReenviarVerificacion} style={secondaryButtonStyle}>
-                                <span style={buttonIconStyle}>📧</span>
-                                Solicitar Nuevo Enlace
-                            </button>
-                            <Link to="/login" style={primaryButtonStyle}>
-                                <span style={buttonIconStyle}>🔑</span>
-                                Ir al Login
-                            </Link>
-                        </div>
+                        <Link to="/login" style={primaryButtonStyle}>
+                            <span style={buttonIconStyle}>🔑</span>
+                            Ir al Login
+                        </Link>
                     </div>
                 )}
 
@@ -124,20 +106,10 @@ function VerificarEmail() {
                         <div style={expiredIconStyle}>⏰</div>
                         <h1 style={expiredTitleStyle}>Enlace Expirado</h1>
                         <p style={expiredMessageStyle}>{mensaje}</p>
-                        <div style={expiredDetailsStyle}>
-                            <p>🕐 Los enlaces de verificación expiran después de 24 horas por seguridad.</p>
-                            <p>📧 Puedes solicitar un nuevo enlace de verificación.</p>
-                        </div>
-                        <div style={actionButtonsStyle}>
-                            <button onClick={handleReenviarVerificacion} style={secondaryButtonStyle}>
-                                <span style={buttonIconStyle}>📧</span>
-                                Solicitar Nuevo Enlace
-                            </button>
-                            <Link to="/login" style={primaryButtonStyle}>
-                                <span style={buttonIconStyle}>🔑</span>
-                                Ir al Login
-                            </Link>
-                        </div>
+                        <Link to="/login" style={primaryButtonStyle}>
+                            <span style={buttonIconStyle}>🔑</span>
+                            Ir al Login
+                        </Link>
                     </div>
                 )}
             </div>
@@ -145,7 +117,7 @@ function VerificarEmail() {
     );
 }
 
-// Estilos
+// Estilos (los mismos que tenías antes)
 const containerStyle = {
     minHeight: '100vh',
     display: 'flex',
@@ -252,16 +224,6 @@ const errorMessageStyle = {
     lineHeight: 1.6
 };
 
-const errorDetailsStyle = {
-    background: 'linear-gradient(135deg, #fef2f2, #fecaca)',
-    padding: '1.5rem',
-    borderRadius: '1rem',
-    border: '1px solid #ef4444',
-    textAlign: 'left',
-    fontSize: '0.875rem',
-    color: '#6b7280'
-};
-
 const expiredContainerStyle = {
     display: 'flex',
     flexDirection: 'column',
@@ -287,23 +249,6 @@ const expiredMessageStyle = {
     lineHeight: 1.6
 };
 
-const expiredDetailsStyle = {
-    background: 'linear-gradient(135deg, #fefce8, #fef3c7)',
-    padding: '1.5rem',
-    borderRadius: '1rem',
-    border: '1px solid #f59e0b',
-    textAlign: 'left',
-    fontSize: '0.875rem',
-    color: '#6b7280'
-};
-
-const actionButtonsStyle = {
-    display: 'flex',
-    gap: '1rem',
-    justifyContent: 'center',
-    flexWrap: 'wrap'
-};
-
 const primaryButtonStyle = {
     background: 'linear-gradient(135deg, #ec4899, #f472b6)',
     color: 'white',
@@ -316,21 +261,6 @@ const primaryButtonStyle = {
     alignItems: 'center',
     gap: '8px',
     border: 'none',
-    cursor: 'pointer'
-};
-
-const secondaryButtonStyle = {
-    background: 'transparent',
-    color: '#6b7280',
-    padding: '12px 24px',
-    borderRadius: '8px',
-    border: '2px solid #d1d5db',
-    textDecoration: 'none',
-    fontWeight: '600',
-    fontSize: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
     cursor: 'pointer'
 };
 
