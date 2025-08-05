@@ -18,9 +18,15 @@ import RestablecerContrasena from './pages/RestablecerContrasena';
 function App() {
   const location = useLocation();
   
+  // DEBUG: Ver qué ruta se está cargando
+  console.log('🔍 Ruta actual:', location.pathname);
+  console.log('🔍 Search params:', location.search);
+  
   // Rutas que NO deben mostrar el Header
   const rutasSinHeader = ['/login', '/', '/verificar-email', '/solicitar-restablecimiento', '/restablecer-contrasena'];
   const mostrarHeader = !rutasSinHeader.includes(location.pathname);
+  
+  console.log('🔍 Mostrar header:', mostrarHeader);
 
   return (
     <>
