@@ -16,9 +16,10 @@ const createTransport = () => {
 // Función para enviar email de verificación
 const sendVerificationEmail = async (email, verificationToken, userName) => {
   const transporter = createTransport();
-  
-  const verificationUrl = `${process.env.FRONTEND_URL}/verificar-email?token=${verificationToken}`;
-  
+
+  // backend/config/emailConfig.js - LÍNEA A CAMBIAR
+  const verificationUrl = `${process.env.FRONTEND_URL}/#/verificar-email?token=${verificationToken}`;
+
   const mailOptions = {
     from: {
       name: 'Art Mary - Librería y Papelería',
@@ -107,7 +108,7 @@ const sendVerificationEmail = async (email, verificationToken, userName) => {
 // Función para enviar email de bienvenida (después de verificar)
 const sendWelcomeEmail = async (email, userName) => {
   const transporter = createTransport();
-  
+
   const mailOptions = {
     from: {
       name: 'Art Mary - Librería y Papelería',
@@ -186,9 +187,9 @@ const sendWelcomeEmail = async (email, userName) => {
 // NUEVA FUNCIÓN: Enviar email de restablecimiento de contraseña
 const sendPasswordResetEmail = async (email, resetToken, userName) => {
   const transporter = createTransport();
-  
+
   const resetUrl = `${process.env.FRONTEND_URL}/restablecer-contrasena?token=${resetToken}`;
-  
+
   const mailOptions = {
     from: {
       name: 'Art Mary - Librería y Papelería',
