@@ -1,19 +1,17 @@
-// src/main.jsx - VERSIÓN TEMPORAL SIN AUTH PROVIDER
+// src/main.jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
-import { BrowserRouter } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom'; // CAMBIAR ESTA LÍNEA
 import { CartProvider } from './context/CartContext';
-// import { AuthProvider } from './context/AuthContext.jsx'; // COMENTAMOS TEMPORALMENTE
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <HashRouter> {/* CAMBIAR ESTA LÍNEA */}
       <CartProvider>
-        {/* TEMPORALMENTE SIN AuthProvider */}
         <App />
       </CartProvider>
-    </BrowserRouter>
+    </HashRouter>
   </React.StrictMode>
 );
