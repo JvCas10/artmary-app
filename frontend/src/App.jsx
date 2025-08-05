@@ -1,5 +1,5 @@
 // src/App.jsx
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Login from './pages/Login';
 import Catalogo from './pages/Catalogo';
 import CrearProducto from './pages/CrearProducto';
@@ -7,7 +7,7 @@ import Carrito from './pages/Carrito';
 import ConfirmarPedido from './pages/ConfirmarPedido';
 import AdminPanel from './pages/AdminPanel';
 import MisPedidos from './pages/MisPedidos';
-import NotFoundPage from './pages/NotFoundPage'; // <-- ¡IMPORTA NotFoundPage!
+import NotFoundPage from './pages/NotFoundPage';
 import Header from './components/Header';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
@@ -16,9 +16,15 @@ import SolicitarRestablecimiento from './pages/SolicitarRestablecimiento';
 import RestablecerContrasena from './pages/RestablecerContrasena';
 
 function App() {
+  const location = useLocation();
+  
+  // Rutas que NO deben mostrar el Header
+  const rutasSinHeader = ['/login', '/', '/verificar-email', '/solicitar-restablecimiento', '/restablecer-contrasena'];
+  const mostrarHeader = !rutasSinHeader.includes(location.pathname);
+
   return (
     <>
-      <Header />
+      {mostrarHeader && <Header />}
       <Routes>
         {/* Rutas públicas */}
         <Route path="/" element={<Login />} />
@@ -42,7 +48,7 @@ function App() {
         </Route>
 
         {/* Ruta para 404 Not Found (SIEMPRE VA AL FINAL) */}
-        <Route path="*" element={<NotFoundPage />} /> {/* <-- ¡AÑADE ESTA RUTA! */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>
   );
