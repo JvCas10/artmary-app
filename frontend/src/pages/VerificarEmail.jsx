@@ -52,6 +52,9 @@ function VerificarEmail() {
                     setEstado('error');
                     setMensaje(errorMsg || 'Error al verificar el email.');
                 }
+            } finally {
+                // ¡ESTA LÍNEA FALTABA!
+                setLoading(false);
             }
         };
 
@@ -59,8 +62,6 @@ function VerificarEmail() {
     }, [searchParams, navigate]);
 
     const handleReenviarVerificacion = async () => {
-        // Esta función se implementará cuando tengamos el email del usuario
-        // Por ahora redirigimos al login para que puedan solicitar reenvío
         navigate('/login');
     };
 
@@ -139,12 +140,12 @@ function VerificarEmail() {
                         <div style={actionButtonsStyle}>
                             <button
                                 onClick={handleReenviarVerificacion}
-                                style={primaryButtonStyle}
+                                style={secondaryButtonStyle}
                             >
                                 <span style={buttonIconStyle}>📧</span>
                                 Solicitar Nuevo Enlace
                             </button>
-                            <Link to="/login" style={secondaryButtonStyle}>
+                            <Link to="/login" style={primaryButtonStyle}>
                                 <span style={buttonIconStyle}>🔑</span>
                                 Ir al Login
                             </Link>
@@ -156,27 +157,24 @@ function VerificarEmail() {
     );
 }
 
-// Estilos
+// Estilos (mantén todos los estilos que ya tienes)
 const containerStyle = {
     minHeight: '100vh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'var(--gradient-background)',
-    padding: '2rem',
-    fontFamily: 'var(--font-sans)'
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '2rem'
 };
 
 const cardStyle = {
     background: 'white',
-    borderRadius: '2rem',
+    borderRadius: '20px',
     padding: '3rem',
-    boxShadow: '0 25px 50px rgba(0, 0, 0, 0.15)',
-    border: '1px solid var(--neutral-200)',
-    maxWidth: '500px',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.1)',
+    maxWidth: '600px',
     width: '100%',
-    textAlign: 'center',
-    animation: 'slideIn 0.6s ease-out'
+    textAlign: 'center'
 };
 
 const loadingContainerStyle = {
@@ -189,22 +187,22 @@ const loadingContainerStyle = {
 const spinnerStyle = {
     width: '50px',
     height: '50px',
-    border: '4px solid var(--secondary-200)',
-    borderTop: '4px solid var(--primary-500)',
+    border: '4px solid #f3f3f3',
+    borderTop: '4px solid #ec4899',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite'
 };
 
 const titleStyle = {
-    fontSize: '1.75rem',
-    fontWeight: '700',
-    color: 'var(--neutral-800)',
+    fontSize: '1.5rem',
+    fontWeight: '600',
+    color: '#374151',
     margin: 0
 };
 
 const subtitleStyle = {
     fontSize: '1rem',
-    color: 'var(--neutral-600)',
+    color: '#6b7280',
     margin: 0
 };
 
@@ -216,21 +214,19 @@ const successContainerStyle = {
 };
 
 const successIconStyle = {
-    fontSize: '4rem',
-    animation: 'bounce 1s infinite'
+    fontSize: '4rem'
 };
 
 const successTitleStyle = {
     fontSize: '2rem',
     fontWeight: '800',
     color: '#22c55e',
-    margin: 0,
-    fontFamily: 'var(--font-display)'
+    margin: 0
 };
 
 const successMessageStyle = {
     fontSize: '1.125rem',
-    color: 'var(--neutral-700)',
+    color: '#374151',
     margin: 0,
     lineHeight: 1.6
 };
@@ -258,13 +254,12 @@ const errorTitleStyle = {
     fontSize: '2rem',
     fontWeight: '800',
     color: '#ef4444',
-    margin: 0,
-    fontFamily: 'var(--font-display)'
+    margin: 0
 };
 
 const errorMessageStyle = {
     fontSize: '1.125rem',
-    color: 'var(--neutral-700)',
+    color: '#374151',
     margin: 0,
     lineHeight: 1.6
 };
@@ -276,7 +271,7 @@ const errorDetailsStyle = {
     border: '1px solid #ef4444',
     textAlign: 'left',
     fontSize: '0.875rem',
-    color: 'var(--neutral-600)'
+    color: '#6b7280'
 };
 
 const expiredContainerStyle = {
@@ -294,13 +289,12 @@ const expiredTitleStyle = {
     fontSize: '2rem',
     fontWeight: '800',
     color: '#f59e0b',
-    margin: 0,
-    fontFamily: 'var(--font-display)'
+    margin: 0
 };
 
 const expiredMessageStyle = {
     fontSize: '1.125rem',
-    color: 'var(--neutral-700)',
+    color: '#374151',
     margin: 0,
     lineHeight: 1.6
 };
@@ -312,95 +306,48 @@ const expiredDetailsStyle = {
     border: '1px solid #f59e0b',
     textAlign: 'left',
     fontSize: '0.875rem',
-    color: 'var(--neutral-600)'
+    color: '#6b7280'
 };
 
 const actionButtonsStyle = {
     display: 'flex',
     gap: '1rem',
-    flexDirection: 'column',
-    width: '100%'
+    justifyContent: 'center',
+    flexWrap: 'wrap'
 };
 
 const primaryButtonStyle = {
+    background: 'linear-gradient(135deg, #ec4899, #f472b6)',
+    color: 'white',
+    padding: '12px 24px',
+    borderRadius: '8px',
+    textDecoration: 'none',
+    fontWeight: '600',
+    fontSize: '14px',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.75rem',
-    padding: '1rem 2rem',
-    background: 'var(--gradient-primary)',
-    color: 'white',
-    textDecoration: 'none',
-    borderRadius: '1rem',
-    fontSize: '1rem',
-    fontWeight: '700',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 8px 25px rgba(236, 72, 153, 0.4)',
+    gap: '8px',
     border: 'none',
     cursor: 'pointer'
 };
 
 const secondaryButtonStyle = {
+    background: 'transparent',
+    color: '#6b7280',
+    padding: '12px 24px',
+    borderRadius: '8px',
+    border: '2px solid #d1d5db',
+    textDecoration: 'none',
+    fontWeight: '600',
+    fontSize: '14px',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.75rem',
-    padding: '1rem 2rem',
-    background: 'transparent',
-    color: 'var(--primary-600)',
-    textDecoration: 'none',
-    borderRadius: '1rem',
-    fontSize: '1rem',
-    fontWeight: '700',
-    transition: 'all 0.3s ease',
-    border: '2px solid var(--primary-300)',
+    gap: '8px',
     cursor: 'pointer'
 };
 
 const buttonIconStyle = {
-    fontSize: '1.25rem'
+    fontSize: '16px'
 };
-
-// CSS adicional para animaciones
-const additionalStyles = `
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes bounce {
-  0%, 20%, 50%, 80%, 100% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-10px);
-  }
-  60% {
-    transform: translateY(-5px);
-  }
-}
-`;
-
-// Inyectar estilos
-if (typeof document !== 'undefined') {
-    const existingStyle = document.getElementById('verificar-email-styles');
-    if (!existingStyle) {
-        const styleSheet = document.createElement('style');
-        styleSheet.id = 'verificar-email-styles';
-        styleSheet.textContent = additionalStyles;
-        document.head.appendChild(styleSheet);
-    }
-}
 
 export default VerificarEmail;
