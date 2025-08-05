@@ -1,4 +1,4 @@
-// src/App.jsx
+// src/App.jsx - VERSIÓN DE DIAGNÓSTICO
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Login from './pages/Login';
 import Catalogo from './pages/Catalogo';
@@ -15,12 +15,33 @@ import VerificarEmail from './pages/VerificarEmail';
 import SolicitarRestablecimiento from './pages/SolicitarRestablecimiento';
 import RestablecerContrasena from './pages/RestablecerContrasena';
 
+// Componente de prueba simple
+function PruebaVerificacion() {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#f0f8ff',
+      color: '#000',
+      fontSize: '24px',
+      fontWeight: 'bold',
+      flexDirection: 'column'
+    }}>
+      <h1>🎉 RUTA DE VERIFICACIÓN FUNCIONANDO!</h1>
+      <p>URL actual: {window.location.href}</p>
+      <p>Token: {new URLSearchParams(window.location.search).get('token')}</p>
+    </div>
+  );
+}
+
 function App() {
   const location = useLocation();
   
-  // DEBUG: Ver qué ruta se está cargando
-  console.log('🔍 Ruta actual:', location.pathname);
-  console.log('🔍 Search params:', location.search);
+  // DEBUG
+  console.log('🔍 Ruta actual en App:', location.pathname);
+  console.log('🔍 Search params en App:', location.search);
   
   // Rutas que NO deben mostrar el Header
   const rutasSinHeader = ['/login', '/', '/verificar-email', '/solicitar-restablecimiento', '/restablecer-contrasena'];
@@ -31,11 +52,28 @@ function App() {
   return (
     <>
       {mostrarHeader && <Header />}
+      
+      {/* MENSAJE DE DEBUG VISIBLE */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        background: 'yellow',
+        color: 'black',
+        padding: '10px',
+        zIndex: 9999,
+        fontSize: '12px'
+      }}>
+        DEBUG: Ruta actual = {location.pathname} | Search = {location.search}
+      </div>
+      
       <Routes>
+        {/* RUTA DE VERIFICACIÓN CON COMPONENTE SIMPLE */}
+        <Route path="/verificar-email" element={<PruebaVerificacion />} />
+        
         {/* Rutas públicas */}
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/verificar-email" element={<VerificarEmail />} />
         <Route path="/solicitar-restablecimiento" element={<SolicitarRestablecimiento />} />
         <Route path="/restablecer-contrasena" element={<RestablecerContrasena />} />
 
