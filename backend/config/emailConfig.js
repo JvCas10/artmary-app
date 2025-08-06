@@ -14,7 +14,7 @@ const createTransport = () => {
 };
 
 // Función para enviar email de verificación
-const sendVerificationEmail = async (email, verificationToaken, userName) => {
+const sendVerificationEmail = async (email, verificationToken, userName) => {
   const transporter = createTransport();
 
   // backend/config/emailConfig.js - LÍNEA A CAMBIAR
