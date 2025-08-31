@@ -4,28 +4,59 @@ import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import Pagination from '../components/Pagination';
+// Agregar estas líneas para las gráficas
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 // Importar el componente PuntoDeVenta
 import PuntoDeVenta from '../components/admin/PuntoDeVenta';
+
 
 // Animaciones y estilos globales
 if (!window._adminPanelCustomStyles) {
   const styleSheet = document.createElement("style");
   styleSheet.innerText = `
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes slideInDown { from { opacity:0; transform: translateY(-16px);} to { opacity:1; transform: translateY(0);} }
-    .fadeIn { animation: fadeIn 0.7s; }
-    @media (max-width: 768px) {
-      .responsive-table { min-width: 520px; }
-      .responsive-card { padding: 1em 0.5em !important; }
-      .section-header { flex-direction: column !important; gap: 1em !important; align-items: stretch !important; }
-      .tabs-container { overflow-x: auto !important; }
-      .tab-button { min-width: max-content !important; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideInDown { from { opacity:0; transform: translateY(-16px);} to { opacity:1; transform: translateY(0);} }
+  .fadeIn { animation: fadeIn 0.7s; }
+  
+  @media (max-width: 768px) {
+    .responsive-table { min-width: 520px; }
+    .responsive-card { padding: 1em 0.5em !important; }
+    .section-header { flex-direction: column !important; gap: 1em !important; align-items: stretch !important; }
+    .tabs-container { 
+      overflow-x: auto !important;
+      padding-bottom: 0.5rem !important;
     }
-  `;
+    .tab-button { 
+      min-width: max-content !important;
+      font-size: 0.85rem !important;
+      padding: 0.75rem 1rem !important;
+    }
+    
+    .admin-page-wrapper {
+      padding-top: 70px !important;
+      padding-left: 0.25rem !important;
+      padding-right: 0.25rem !important;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .admin-page-wrapper {
+      padding-top: 60px !important;
+      padding-left: 0.125rem !important;
+      padding-right: 0.125rem !important;
+    }
+    
+    .tab-button {
+      font-size: 0.8rem !important;
+      padding: 0.6rem 0.8rem !important;
+    }
+  }
+`;
   document.head.appendChild(styleSheet);
   window._adminPanelCustomStyles = true;
 }
+
 
 function AdminPanel() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -66,7 +97,7 @@ function AdminPanel() {
   const [todosLosProductos, setTodosLosProductos] = useState([]);
   const [productSearchTerm, setProductSearchTerm] = useState('');
 
-  const orderStatuses = ['pendiente', 'confirmado', 'enviado', 'entregado', 'cancelado', 'listo_para_recoger'];
+  const orderStatuses = ['confirmado', 'entregado', 'cancelado', 'listo_para_recoger'];
 
   const clearMessage = useCallback((type) => {
     setTimeout(() => {
@@ -77,6 +108,35 @@ function AdminPanel() {
       }
     }, 5000);
   }, []);
+
+  const obtenerDatosGrafica = () => {
+    const ventasFiltradas = obtenerVentasFiltradas();
+    // Procesar datos para la gráfica
+    return ventasFiltradas.slice(-7).map((venta, index) => ({
+      fecha: new Date(venta.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }),
+      ventas: venta.gananciaTotal || 0
+    }));
+  };
+
+  // Función auxiliar para validar y normalizar datos de productos en ventas
+  const normalizarProductoVenta = (producto) => {
+    const esConjunto = producto.tipoVenta === 'conjunto' ||
+      (producto.nombreConjunto && producto.unidadesPorConjunto);
+
+    return {
+      ...producto,
+      esConjunto,
+      cantidadConjuntos: esConjunto ?
+        (producto.cantidadOriginal || Math.floor(producto.cantidad / (producto.unidadesPorConjunto || 1))) : 0,
+      unidadesTotales: producto.cantidad || 0,
+      precioUnitarioReal: esConjunto ?
+        (producto.precioConjunto || producto.precioVenta) :
+        producto.precioVenta,
+      descripcionVenta: esConjunto ?
+        `${producto.cantidadOriginal || Math.floor(producto.cantidad / (producto.unidadesPorConjunto || 1))} ${producto.nombreConjunto || 'conjuntos'} (${producto.cantidad} unidades)` :
+        `${producto.cantidad} unidades`
+    };
+  };
 
   // Funciones para obtener datos
   const obtenerProductos = useCallback(async (page = 1, search = '') => {
@@ -130,7 +190,7 @@ function AdminPanel() {
 
   const obtenerTodosLosProductos = useCallback(async () => {
     try {
-      const response = await axios.get('/productos/todos');
+      const response = await axios.get('/productos/admin/todos');
       setTodosLosProductos(response.data?.productos || []);
       return response.data?.productos || [];
     } catch (err) {
@@ -213,6 +273,7 @@ function AdminPanel() {
   const handleOrdersPageChange = (newPage) => {
     obtenerTodosLosPedidos(newPage);
   };
+
 
   const handleDeleteProduct = async (productId) => {
     if (!productId) {
@@ -310,36 +371,29 @@ function AdminPanel() {
   };
 
   // Función para unificar todas las ventas (físicas + online entregadas)
+  // Función para obtener todas las ventas (físicas + online entregadas) con datos normalizados
   const obtenerTodasLasVentas = () => {
-    const ventasFisicas = ventas.map(venta => ({
+    const ventasFisicas = (ventas || []).map(venta => ({
       ...venta,
       tipo: 'fisica',
-      fecha: venta.fecha,
-      cliente: venta.cliente,
-      total: venta.total,
-      gananciaTotal: venta.gananciaTotal,
-      productos: venta.productos
+      productos: (venta.productos || []).map(normalizarProductoVenta)
     }));
 
-    const ventasOnline = orders
-      .filter(order => order.estado === 'entregado')
-      .map(order => ({
-        _id: order._id,
+    const pedidosEntregados = (orders || [])
+      .filter(pedido => pedido.estado === 'entregado')
+      .map(pedido => ({
+        ...pedido,
         tipo: 'online',
-        fecha: order.fecha,
-        cliente: {
-          nombre: getUserInfo(order, 'nombre'),
-          telefono: getUserInfo(order, 'telefono') || 'N/A'
-        },
-        total: order.total,
-        gananciaTotal: order.gananciaTotal || 0,
-        productos: order.productos || [],
-        estado: order.estado
+        productos: (pedido.productos || []).map(producto => normalizarProductoVenta({
+          ...producto,
+          cantidad: producto.tipoVenta === 'conjunto' ?
+            (producto.cantidadOriginal || producto.cantidad) * (producto.unidadesPorConjunto || 1) :
+            producto.cantidad
+        }))
       }));
 
-    return [...ventasFisicas, ...ventasOnline].sort((a, b) =>
-      new Date(b.fecha) - new Date(a.fecha)
-    );
+    return [...ventasFisicas, ...pedidosEntregados]
+      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
   };
 
   // Función para filtrar ventas por período
@@ -371,8 +425,7 @@ function AdminPanel() {
     });
   };
 
-  // Función para obtener datos para gráficas
-  // Función para obtener datos para gráficas
+  /// Función para obtener datos para gráficas
   const obtenerDatosGraficas = () => {
     const ventasFiltradas = obtenerVentasFiltradas();
 
@@ -396,12 +449,23 @@ function AdminPanel() {
       ganancias: gananciasPorDia[fecha] || 0
     })).sort((a, b) => new Date(a.fecha.split('/').reverse().join('-')) - new Date(b.fecha.split('/').reverse().join('-')));
 
-    // Datos para gráfica de productos más vendidos
+    // Datos para gráfica de productos más vendidos CON LÓGICA DE CONJUNTOS
     const productosVendidos = {};
     ventasFiltradas.forEach(venta => {
       (venta.productos || []).forEach(producto => {
         const nombre = producto.nombre;
-        productosVendidos[nombre] = (productosVendidos[nombre] || 0) + producto.cantidad;
+        if (!productosVendidos[nombre]) {
+          productosVendidos[nombre] = 0;
+        }
+
+        // NUEVA LÓGICA: Contar unidades totales (incluye conjuntos convertidos a unidades)
+        const esConjunto = producto.tipoVenta === 'conjunto' || (producto.nombreConjunto && producto.unidadesPorConjunto);
+
+        if (esConjunto) {
+          productosVendidos[nombre] += producto.cantidad; // Ya viene en unidades totales del backend
+        } else {
+          productosVendidos[nombre] += producto.cantidad; // Unidades individuales
+        }
       });
     });
 
@@ -425,6 +489,7 @@ function AdminPanel() {
   };
 
   // Función auxiliar para obtener productos más vendidos
+  // Función auxiliar para obtener productos más vendidos
   const obtenerProductosMasVendidos = () => {
     const todasLasVentas = obtenerTodasLasVentas();
     const productosVendidos = {};
@@ -436,11 +501,23 @@ function AdminPanel() {
           productosVendidos[nombre] = {
             nombre,
             cantidadVendida: 0,
+            conjuntosVendidos: 0,
             ingresoTotal: 0
           };
         }
-        productosVendidos[nombre].cantidadVendida += producto.cantidad;
-        productosVendidos[nombre].ingresoTotal += (producto.precioVenta || producto.precio) * producto.cantidad;
+
+        // LÓGICA CORREGIDA: Distinguir entre conjuntos e individuales
+        const esConjunto = producto.tipoVenta === 'conjunto' || (producto.nombreConjunto && producto.unidadesPorConjunto);
+
+        if (esConjunto) {
+          const cantidadConjuntos = producto.cantidadOriginal || Math.floor(producto.cantidad / (producto.unidadesPorConjunto || 1));
+          productosVendidos[nombre].conjuntosVendidos += cantidadConjuntos;
+          productosVendidos[nombre].cantidadVendida += producto.cantidad; // Unidades totales
+        } else {
+          productosVendidos[nombre].cantidadVendida += producto.cantidad;
+        }
+
+        productosVendidos[nombre].ingresoTotal += (producto.precioVenta || producto.precio) * (producto.cantidadOriginal || producto.cantidad);
       });
     });
 
@@ -448,6 +525,7 @@ function AdminPanel() {
       .sort((a, b) => b.cantidadVendida - a.cantidadVendida);
   };
 
+  // Calcular estadísticas para el dashboard
   // Calcular estadísticas para el dashboard
   // Calcular estadísticas para el dashboard
   const calcularEstadisticas = () => {
@@ -463,9 +541,24 @@ function AdminPanel() {
       return acc + (venta.gananciaTotal || 0);
     }, 0);
 
-    const productosVendidos = ventasFiltradas.reduce((acc, venta) => {
-      return acc + (venta.productos || []).reduce((sum, prod) => sum + (prod.cantidad || 0), 0);
-    }, 0);
+    // NUEVA LÓGICA CORREGIDA: Calcular unidades y conjuntos vendidos
+    let totalUnidadesVendidas = 0;
+    let totalConjuntosVendidos = 0;
+
+    ventasFiltradas.forEach(venta => {
+      (venta.productos || []).forEach(prod => {
+        // Detectar si es conjunto
+        const esConjunto = prod.tipoVenta === 'conjunto' || (prod.nombreConjunto && prod.unidadesPorConjunto);
+
+        if (esConjunto) {
+          const cantidadConjuntos = prod.cantidadOriginal || Math.floor(prod.cantidad / (prod.unidadesPorConjunto || 1));
+          totalConjuntosVendidos += cantidadConjuntos;
+          totalUnidadesVendidas += prod.cantidad; // Unidades totales (ya viene correcto del backend)
+        } else {
+          totalUnidadesVendidas += prod.cantidad;
+        }
+      });
+    });
 
     const ventasEsteMes = ventasFiltradas.filter(v => {
       const fechaVenta = new Date(v.fecha);
@@ -477,7 +570,8 @@ function AdminPanel() {
       ventasHoy,
       ventasEsteMes,
       gananciasTotal,
-      productosVendidos,
+      productosVendidos: totalUnidadesVendidas, // Ahora incluye lógica correcta de conjuntos
+      totalConjuntosVendidos, // NUEVO: total de conjuntos vendidos
       productosEnStock: productos.filter(p => p.stock > 0).length,
       productosSinStock: productos.filter(p => p.stock === 0).length,
       ingresosBrutos: ventasFiltradas.reduce((acc, venta) => acc + (venta.total || 0), 0)
@@ -519,7 +613,7 @@ function AdminPanel() {
   const todasLasVentas = obtenerTodasLasVentas();
 
   return (
-    <div style={pageWrapperStyle}>
+    <div style={pageWrapperStyle} className="admin-page-wrapper">
       {/* Hero Header */}
       <div style={heroHeaderStyle}>
         <div style={heroContentStyle}>
@@ -633,145 +727,474 @@ function AdminPanel() {
         {/* Contenido de las pestañas */}
         {activeTab === 'dashboard' && (
           <div style={tabContentStyle} className="fadeIn">
-            <div style={dashboardGridStyle}>
-              {/* Métricas principales */}
-              <div style={metricsContainerStyle}>
-                <h2 style={sectionTitleStyle}>
-                  <span style={sectionIconStyle}>📊</span>
-                  Métricas Principales
-                </h2>
-                <div style={metricsGridStyle}>
-                  <div style={metricCardStyle}>
-                    <div style={metricIconContainerStyle}>
-                      <span style={{ ...metricIconStyle, background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}>💰</span>
-                    </div>
-                    <div style={metricContentStyle}>
-                      <h3 style={metricValueStyle}>Q{formatPrice(estadisticas.gananciasTotal)}</h3>
-                      <p style={metricLabelStyle}>Ganancias Netas</p>
-                    </div>
-                  </div>
+            {/* Dashboard Mejorado */}
+            <div style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '2rem',
+              padding: '2rem',
+              marginBottom: '2rem',
+              color: 'white'
+            }}>
+              <h2 style={{
+                fontSize: '2.5rem',
+                fontWeight: '800',
+                textAlign: 'center',
+                marginBottom: '1rem',
+                textShadow: '0 4px 20px rgba(0,0,0,0.3)'
+              }}>
+                📊 Dashboard Art Mary
+              </h2>
+              <p style={{
+                textAlign: 'center',
+                fontSize: '1.1rem',
+                opacity: 0.9
+              }}>
+                Panel de control y métricas de negocio
+              </p>
+            </div>
 
-                  <div style={metricCardStyle}>
-                    <div style={metricIconContainerStyle}>
-                      <span style={{ ...metricIconStyle, background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' }}>💵</span>
-                    </div>
-                    <div style={metricContentStyle}>
-                      <h3 style={metricValueStyle}>Q{formatPrice(estadisticas.ingresosBrutos)}</h3>
-                      <p style={metricLabelStyle}>Ingresos Brutos</p>
-                    </div>
-                  </div>
+            {/* Filtros Temporales */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: '20px',
+              padding: '1.5rem',
+              marginBottom: '2rem',
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center',
+              flexWrap: 'wrap'
+            }}>
+              {['dia', 'semana', 'mes'].map((filtro) => (
+                <button
+                  key={filtro}
+                  onClick={() => setFiltroTemporal(filtro)}
+                  style={{
+                    padding: '0.8rem 1.5rem',
+                    background: filtroTemporal === filtro ?
+                      'linear-gradient(135deg, #667eea, #764ba2)' :
+                      'rgba(255, 255, 255, 0.5)',
+                    color: filtroTemporal === filtro ? 'white' : '#667eea',
+                    border: '1px solid rgba(102, 126, 234, 0.3)',
+                    borderRadius: '15px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    textTransform: 'capitalize'
+                  }}
+                >
+                  📅 {filtro === 'dia' ? 'Hoy' : filtro === 'semana' ? 'Esta Semana' : 'Este Mes'}
+                </button>
+              ))}
+            </div>
 
-                  <div style={metricCardStyle}>
-                    <div style={metricIconContainerStyle}>
-                      <span style={{ ...metricIconStyle, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>📊</span>
-                    </div>
-                    <div style={metricContentStyle}>
-                      <h3 style={metricValueStyle}>{estadisticas.totalVentas}</h3>
-                      <p style={metricLabelStyle}>Ventas Totales</p>
-                    </div>
+            {/* Métricas Principales Mejoradas */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '1.5rem',
+              marginBottom: '3rem'
+            }}>
+              {/* Tarjeta Ganancias */}
+              <div style={{
+                position: 'relative',
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '24px',
+                padding: '2rem',
+                overflow: 'hidden',
+                transition: 'all 0.4s ease',
+                cursor: 'pointer'
+              }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 25px 50px rgba(0, 0, 0, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '18px',
+                    background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.5rem',
+                    boxShadow: '0 8px 32px rgba(34, 197, 94, 0.3)'
+                  }}>
+                    💰
                   </div>
-
-                  <div style={metricCardStyle}>
-                    <div style={metricIconContainerStyle}>
-                      <span style={{ ...metricIconStyle, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>🔥</span>
-                    </div>
-                    <div style={metricContentStyle}>
-                      <h3 style={metricValueStyle}>{estadisticas.ventasHoy}</h3>
-                      <p style={metricLabelStyle}>Ventas Hoy</p>
-                    </div>
-                  </div>
-
-                  <div style={metricCardStyle}>
-                    <div style={metricIconContainerStyle}>
-                      <span style={{ ...metricIconStyle, background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }}>📅</span>
-                    </div>
-                    <div style={metricContentStyle}>
-                      <h3 style={metricValueStyle}>{estadisticas.ventasEsteMes}</h3>
-                      <p style={metricLabelStyle}>Ventas Este Mes</p>
-                    </div>
-                  </div>
-
-                  <div style={metricCardStyle}>
-                    <div style={metricIconContainerStyle}>
-                      <span style={{ ...metricIconStyle, background: 'linear-gradient(135deg, #ec4899, #db2777)' }}>📦</span>
-                    </div>
-                    <div style={metricContentStyle}>
-                      <h3 style={metricValueStyle}>{estadisticas.productosVendidos}</h3>
-                      <p style={metricLabelStyle}>Productos Vendidos</p>
-                    </div>
-                  </div>
-
-                  <div style={metricCardStyle}>
-                    <div style={metricIconContainerStyle}>
-                      <span style={{ ...metricIconStyle, background: 'linear-gradient(135deg, #10b981, #059669)' }}>✅</span>
-                    </div>
-                    <div style={metricContentStyle}>
-                      <h3 style={metricValueStyle}>{estadisticas.productosEnStock}</h3>
-                      <p style={metricLabelStyle}>En Stock</p>
-                    </div>
-                  </div>
-
-                  <div style={metricCardStyle}>
-                    <div style={metricIconContainerStyle}>
-                      <span style={{ ...metricIconStyle, background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>⚠️</span>
-                    </div>
-                    <div style={metricContentStyle}>
-                      <h3 style={metricValueStyle}>{estadisticas.productosSinStock}</h3>
-                      <p style={metricLabelStyle}>Sin Stock</p>
-                    </div>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '12px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    color: '#16a34a'
+                  }}>
+                    📈 +15.3%
                   </div>
                 </div>
+                <div style={{
+                  fontSize: '2.5rem',
+                  fontWeight: '800',
+                  color: '#1f2937',
+                  marginBottom: '0.5rem'
+                }}>
+                  Q{formatPrice(estadisticas.gananciasTotal)}
+                </div>
+                <div style={{
+                  fontSize: '1rem',
+                  color: '#6b7280',
+                  fontWeight: '600'
+                }}>
+                  Ganancias Netas
+                </div>
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '4px',
+                  background: 'linear-gradient(90deg, #22c55e, #16a34a)',
+                  borderRadius: '0 0 24px 24px'
+                }}></div>
               </div>
 
-              {/* Resumen rápido */}
-              <div style={quickSummaryStyle}>
-                <h3 style={summaryTitleStyle}>
-                  <span style={sectionIconStyle}>⚡</span>
-                  Acciones Rápidas
-                </h3>
-                <div style={summaryItemsStyle}>
-                  <button
-                    onClick={() => setActiveTab('pos')}
-                    style={quickActionButtonStyle}
-                  >
-                    <span style={summaryIconStyle}>🏪</span>
-                    <div style={summaryTextStyle}>
-                      <strong>Usar Punto de Venta</strong>
-                      <p>Registrar ventas físicas</p>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('estadisticas')}
-                    style={quickActionButtonStyle}
-                  >
-                    <span style={summaryIconStyle}>📈</span>
-                    <div style={summaryTextStyle}>
-                      <strong>Ver Estadísticas</strong>
-                      <p>Análisis detallado de ventas</p>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('productos')}
-                    style={quickActionButtonStyle}
-                  >
-                    <span style={summaryIconStyle}>📦</span>
-                    <div style={summaryTextStyle}>
-                      <strong>Gestionar Inventario</strong>
-                      <p>Productos y stock</p>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('pedidos')}
-                    style={quickActionButtonStyle}
-                  >
-                    <span style={summaryIconStyle}>📋</span>
-                    <div style={summaryTextStyle}>
-                      <strong>Procesar Pedidos</strong>
-                      <p>Pedidos online pendientes</p>
-                    </div>
-                  </button>
+              {/* Tarjeta Conjuntos */}
+              <div style={{
+                position: 'relative',
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '24px',
+                padding: '2rem',
+                overflow: 'hidden',
+                transition: 'all 0.4s ease',
+                cursor: 'pointer'
+              }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 25px 50px rgba(0, 0, 0, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '18px',
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.5rem',
+                    boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3)'
+                  }}>
+                    📦
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '12px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    color: '#16a34a'
+                  }}>
+                    📈 +8.2%
+                  </div>
                 </div>
+                <div style={{
+                  fontSize: '2.5rem',
+                  fontWeight: '800',
+                  color: '#1f2937',
+                  marginBottom: '0.5rem'
+                }}>
+                  {estadisticas.totalConjuntosVendidos}
+                </div>
+                <div style={{
+                  fontSize: '1rem',
+                  color: '#6b7280',
+                  fontWeight: '600'
+                }}>
+                  Conjuntos Vendidos
+                </div>
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '4px',
+                  background: 'linear-gradient(90deg, #3b82f6, #1d4ed8)',
+                  borderRadius: '0 0 24px 24px'
+                }}></div>
               </div>
+
+              {/* Tarjeta Unidades */}
+              <div style={{
+                position: 'relative',
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '24px',
+                padding: '2rem',
+                overflow: 'hidden',
+                transition: 'all 0.4s ease',
+                cursor: 'pointer'
+              }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 25px 50px rgba(0, 0, 0, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '18px',
+                    background: 'linear-gradient(135deg, #06b6d4, #0891b2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.5rem',
+                    boxShadow: '0 8px 32px rgba(6, 182, 212, 0.3)'
+                  }}>
+                    🛍️
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '12px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    color: '#16a34a'
+                  }}>
+                    📈 +12.4%
+                  </div>
+                </div>
+                <div style={{
+                  fontSize: '2.5rem',
+                  fontWeight: '800',
+                  color: '#1f2937',
+                  marginBottom: '0.5rem'
+                }}>
+                  {estadisticas.totalUnidadesVendidas}
+                </div>
+                <div style={{
+                  fontSize: '1rem',
+                  color: '#6b7280',
+                  fontWeight: '600'
+                }}>
+                  Unidades Vendidas
+                </div>
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '4px',
+                  background: 'linear-gradient(90deg, #06b6d4, #0891b2)',
+                  borderRadius: '0 0 24px 24px'
+                }}></div>
+              </div>
+
+              {/* Tarjeta Ventas Hoy */}
+              <div style={{
+                position: 'relative',
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '24px',
+                padding: '2rem',
+                overflow: 'hidden',
+                transition: 'all 0.4s ease',
+                cursor: 'pointer'
+              }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 25px 50px rgba(0, 0, 0, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '18px',
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.5rem',
+                    boxShadow: '0 8px 32px rgba(245, 158, 11, 0.3)'
+                  }}>
+                    📊
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '12px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    color: '#16a34a'
+                  }}>
+                    📈 +5.7%
+                  </div>
+                </div>
+                <div style={{
+                  fontSize: '2.5rem',
+                  fontWeight: '800',
+                  color: '#1f2937',
+                  marginBottom: '0.5rem'
+                }}>
+                  {estadisticas.ventasHoy}
+                </div>
+                <div style={{
+                  fontSize: '1rem',
+                  color: '#6b7280',
+                  fontWeight: '600'
+                }}>
+                  Ventas de Hoy
+                </div>
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '4px',
+                  background: 'linear-gradient(90deg, #f59e0b, #d97706)',
+                  borderRadius: '0 0 24px 24px'
+                }}></div>
+              </div>
+            </div>
+
+            {/* Gráfica de Tendencias */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: '24px',
+              padding: '2rem',
+              marginBottom: '2rem',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)'
+            }}>
+              <h3 style={{
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: '#1f2937',
+                marginBottom: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                📈 Tendencia de Ventas
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={obtenerDatosGrafica()}>
+                  <defs>
+                    <linearGradient id="colorVentas" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#667eea" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#667eea" stopOpacity={0.1} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+                  <XAxis dataKey="fecha" stroke="#6b7280" />
+                  <YAxis stroke="#6b7280" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255,255,255,0.95)',
+                      border: 'none',
+                      borderRadius: '12px',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="ventas"
+                    stroke="#667eea"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#colorVentas)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Resumen Final */}
+            <div style={{
+              background: 'linear-gradient(135deg, #f8fafc, #e2e8f0)',
+              borderRadius: '20px',
+              padding: '2rem',
+              color: '#1f2937',
+              textAlign: 'center',
+              border: '1px solid rgba(148, 163, 184, 0.2)'
+            }}>
+              <h3 style={{
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                marginBottom: '1rem'
+              }}>
+                🎯 Resumen del Período
+              </h3>
+              <p style={{
+                fontSize: '1.1rem',
+                opacity: 0.9,
+                lineHeight: 1.6
+              }}>
+                En {filtroTemporal === 'dia' ? 'el día de hoy' : filtroTemporal === 'semana' ? 'esta semana' : 'este mes'} has vendido{' '}
+                <strong>{estadisticas.totalConjuntosVendidos} conjuntos</strong> y{' '}
+                <strong>{estadisticas.totalUnidadesVendidas} unidades</strong>, generando{' '}
+                <strong>Q{formatPrice(estadisticas.gananciasTotal)}</strong> en ganancias netas.
+              </p>
             </div>
           </div>
         )}
@@ -788,575 +1211,812 @@ function AdminPanel() {
             />
           </div>
         )}
-
         {activeTab === 'historial' && (
           <div style={tabContentStyle} className="fadeIn">
-            <div style={historialContainerStyle}>
-              <div style={sectionHeaderStyle}>
-                <h2 style={sectionTitleStyle}>
-                  <span style={sectionIconStyle}>📈</span>
-                  Historial de Ventas Unificado
-                </h2>
-                <div style={historialStatsStyle}>
-                  <span style={historialStatStyle}>
-                    <strong>{todasLasVentas.length}</strong> ventas totales
-                  </span>
-                  <span style={historialStatStyle}>
-                    <strong>Q{formatPrice(estadisticas.gananciasTotal)}</strong> ganancias
-                  </span>
-                </div>
+            <div style={sectionHeaderStyle}>
+              <h2 style={sectionTitleStyle}>
+                <span style={sectionIconStyle}>📈</span>
+                Historial de Ventas
+              </h2>
+            </div>
+
+            <div style={statsContainerStyle}>
+              <div style={statCardStyle}>
+                <span style={statNumberStyle}>{todasLasVentas.length}</span>
+                <span style={statLabelStyle}>Total Ventas</span>
               </div>
+              <div style={statCardStyle}>
+                <span style={statNumberStyle}>{estadisticas.productosVendidos}</span>
+                <span style={statLabelStyle}>Unidades Vendidas</span>
+              </div>
+              <div style={statCardStyle}>
+                <span style={statNumberStyle}>{estadisticas.totalConjuntosVendidos}</span>
+                <span style={statLabelStyle}>Conjuntos Vendidos</span>
+              </div>
+              <div style={statCardStyle}>
+                <span style={statNumberStyle}>Q{formatPrice(estadisticas.gananciasTotal)}</span>
+                <span style={statLabelStyle}>Ganancias</span>
+              </div>
+            </div>
 
-              {todasLasVentas.length === 0 ? (
-                <div style={emptyStateStyle}>
-                  <div style={emptyIconStyle}>📈</div>
-                  <h3 style={emptyTitleStyle}>No hay ventas registradas</h3>
-                  <p style={emptySubtitleStyle}>
-                    Las ventas físicas y pedidos entregados aparecerán aquí
-                  </p>
-                </div>
-              ) : (
-                <div style={historialListStyle}>
-                  {todasLasVentas.map((venta, index) => (
-                    <div key={`${venta.tipo}-${venta._id}-${index}`} style={historialItemStyle}>
-                      <div style={historialItemHeaderStyle}>
-                        <div style={historialItemInfoStyle}>
-                          <h3 style={historialItemTitleStyle}>
-                            <span style={tipoVentaBadgeStyle(venta.tipo)}>
-                              {venta.tipo === 'fisica' ? '🏪 Venta Física' : '🌐 Venta Online'}
-                            </span>
-                            <span style={historialIdStyle}>
-                              #{venta._id.substring(0, 8)}
-                            </span>
-                          </h3>
-                          <p style={historialDateStyle}>
-                            {new Date(venta.fecha).toLocaleDateString('es-ES', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
-                        </div>
-                        <div style={historialAmountsStyle}>
-                          <div style={historialTotalStyle}>
-                            <span style={historialTotalLabelStyle}>Total:</span>
-                            <span style={historialTotalAmountStyle}>Q{formatPrice(venta.total)}</span>
-                          </div>
-                          <div style={historialGananciaStyle}>
-                            <span style={historialGananciaLabelStyle}>Ganancia:</span>
-                            <span style={historialGananciaAmountStyle}>Q{formatPrice(venta.gananciaTotal)}</span>
-                          </div>
-                        </div>
+            {todasLasVentas.length === 0 ? (
+              <div style={emptyStateStyle}>
+                <div style={emptyIconStyle}>📈</div>
+                <h3 style={emptyTitleStyle}>No hay ventas registradas</h3>
+                <p style={emptySubtitleStyle}>Las ventas físicas y pedidos entregados aparecerán aquí</p>
+              </div>
+            ) : (
+              <div className="historial-responsive-container">
+                {todasLasVentas.map((venta, index) => (
+                  <div key={`${venta.tipo}-${venta._id}-${index}`} className="historial-card" style={historialCardStyle}>
+                    {/* Header de la venta */}
+                    <div className="historial-card-header" style={historialCardHeaderStyle}>
+                      <div style={historialCardIdStyle}>
+                        #{(venta._id || '').slice(-8).toUpperCase()}
                       </div>
-
-                      <div style={historialDetailsStyle}>
-                        <div style={historialClienteStyle}>
-                          <h4 style={historialClienteTitleStyle}>
-                            👤 Cliente: {venta.cliente?.nombre || 'N/A'}
-                          </h4>
-                          {venta.cliente?.telefono && (
-                            <p style={historialClienteInfoStyle}>
-                              📞 {venta.cliente.telefono}
-                            </p>
-                          )}
-                        </div>
-
-                        <div style={historialProductosStyle}>
-                          <h4 style={historialProductosTitleStyle}>
-                            📦 Productos ({(venta.productos || []).length})
-                          </h4>
-                          <div style={historialProductosListStyle}>
-                            {(venta.productos || []).map((producto, idx) => (
-                              <div key={idx} style={historialProductoItemStyle}>
-                                <span style={historialProductoNombreStyle}>
-                                  {producto.nombre}
-                                </span>
-                                <span style={historialProductoCantidadStyle}>
-                                  x{producto.cantidad}
-                                </span>
-                                <span style={historialProductoPrecioStyle}>
-                                  Q{formatPrice(producto.precioVenta || producto.precio)}
-                                </span>
-                                <span style={historialProductoSubtotalStyle}>
-                                  Q{formatPrice((producto.precioVenta || producto.precio) * producto.cantidad)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                      <div className="historial-card-badges">
+                        <span style={venta.tipo === 'fisica' ?
+                          { background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600' } :
+                          { background: '#dbeafe', color: '#1e40af', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600' }
+                        }>
+                          {venta.tipo === 'fisica' ? 'Física' : 'Online'}
+                        </span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+
+                    {/* Info de cliente y fecha */}
+                    <div className="historial-card-info" style={historialCardInfoStyle}>
+                      <div style={historialCardClientStyle}>
+                        <strong>Cliente:</strong> {venta.cliente?.nombre || venta.userId?.nombre || 'N/A'}
+                      </div>
+                      <div style={historialCardDateStyle}>
+                        <strong>Fecha:</strong> {new Date(venta.fecha).toLocaleDateString('es-ES')} • {new Date(venta.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+
+                    {/* Productos */}
+                    <div className="historial-card-productos" style={historialCardProductosStyle}>
+                      <h4 style={historialCardProductosTitleStyle}>Productos:</h4>
+                      {(venta.productos || []).map((prod, idx) => (
+                        <div key={idx} style={historialCardProductoStyle}>
+                          <div style={historialCardProductoInfoStyle}>
+                            <span style={historialCardProductoNombreStyle}>{prod.nombre}</span>
+                            <div style={historialCardProductoCantidadStyle}>
+                              {prod.tipoVenta === 'conjunto' ? (
+                                <>
+                                  <strong>{prod.cantidadOriginal || prod.cantidad} {prod.nombreConjunto || 'conjuntos'}</strong>
+                                  <small style={{ display: 'block', color: '#666' }}>
+                                    ({prod.cantidad || (prod.cantidadOriginal * prod.unidadesPorConjunto)} unidades totales)
+                                  </small>
+                                </>
+                              ) : (
+                                <strong>{prod.cantidad} unidades</strong>
+                              )}
+                            </div>
+                          </div>
+                          <div style={historialCardProductoPrecioStyle}>
+                            Q{formatPrice((prod.precioVenta || prod.precio) * (prod.cantidadOriginal || prod.cantidad))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Totales */}
+                    <div className="historial-card-totales" style={historialCardTotalesStyle}>
+                      <div style={historialCardTotalStyle}>
+                        <strong>Total: Q{formatPrice(venta.total)}</strong>
+                      </div>
+                      <div style={historialCardGananciaStyle}>
+                        Ganancia: Q{formatPrice(venta.gananciaTotal || 0)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
-
         {activeTab === 'estadisticas' && (
           <div style={tabContentStyle} className="fadeIn">
-            <div style={estadisticasContainerStyle}>
-              {/* Header con filtros temporales */}
+            {/* Header con filtros */}
+            <div style={{
+              background: 'white',
+              borderRadius: '1.5rem',
+              padding: '2rem',
+              marginBottom: '2rem',
+              boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+              border: '1px solid #e2e8f0'
+            }}>
+              <h2 style={{
+                fontSize: '2rem',
+                fontWeight: '800',
+                color: '#1e293b',
+                marginBottom: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
+              }}>
+                <span style={{
+                  background: 'linear-gradient(135deg, #ec4899, #be185d)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  fontSize: '2.5rem'
+                }}>📊</span>
+                Estadísticas Avanzadas
+              </h2>
+
+              {/* Header con filtros mejorado */}
               <div style={{
                 background: 'white',
-                borderRadius: '1rem',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-                border: '1px solid var(--neutral-200)',
-                overflow: 'hidden'
+                borderRadius: '1.5rem',
+                padding: '2rem',
+                marginBottom: '2rem',
+                boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+                border: '1px solid #e2e8f0'
               }}>
-                {/* Header compacto */}
-                <div style={{
-                  background: 'var(--gradient-primary)',
-                  color: 'white',
-                  padding: '1.5rem 2rem',
+                <h2 style={{
+                  fontSize: '2rem',
+                  fontWeight: '800',
+                  color: '#1e293b',
+                  marginBottom: '1.5rem',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between'
+                  gap: '0.75rem'
                 }}>
-                  <h2 style={{
-                    fontSize: '1.5rem',
-                    fontWeight: '700',
-                    margin: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem'
-                  }}>
-                    <span style={{ fontSize: '1.5rem' }}>📊</span>
-                    Estadísticas Avanzadas
-                  </h2>
+                  <span style={{
+                    background: 'linear-gradient(135deg, #ec4899, #be185d)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    fontSize: '2.5rem'
+                  }}>📊</span>
+                  Estadísticas Avanzadas
+                </h2>
 
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    backdropFilter: 'blur(10px)',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '0.75rem',
-                    border: '1px solid rgba(255, 255, 255, 0.3)'
+                {/* Información del período seleccionado */}
+                <div style={{
+                  padding: '1rem',
+                  background: '#f1f5f9',
+                  borderRadius: '0.75rem',
+                  marginBottom: '1.5rem',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <p style={{
+                    margin: 0,
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#475569'
                   }}>
-                    <span style={{
+                    📅 Período seleccionado: {' '}
+                    <span style={{ color: '#ec4899' }}>
+                      {filtroTemporal === 'dia' && `Día ${fechaSeleccionada.toLocaleDateString('es-GT', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}`}
+                      {filtroTemporal === 'semana' && `Semana del ${(() => {
+                        const inicioSemana = new Date(fechaSeleccionada);
+                        inicioSemana.setDate(fechaSeleccionada.getDate() - fechaSeleccionada.getDay());
+                        const finSemana = new Date(inicioSemana);
+                        finSemana.setDate(inicioSemana.getDate() + 6);
+                        return `${inicioSemana.toLocaleDateString('es-GT')} al ${finSemana.toLocaleDateString('es-GT')}`;
+                      })()}`}
+                      {filtroTemporal === 'mes' && fechaSeleccionada.toLocaleDateString('es-GT', {
+                        year: 'numeric',
+                        month: 'long'
+                      })}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Controles de filtros */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: '1.5rem',
+                  alignItems: 'end'
+                }}>
+                  {/* Selector de período */}
+                  <div>
+                    <label style={{
+                      display: 'block',
                       fontSize: '0.875rem',
                       fontWeight: '600',
-                      opacity: 0.9
+                      color: '#475569',
+                      marginBottom: '0.5rem'
                     }}>
-                      {filtroTemporal === 'dia' && `📅 ${fechaSeleccionada.toLocaleDateString('es-ES')}`}
-                      {filtroTemporal === 'semana' && `📆 Semana del ${fechaSeleccionada.toLocaleDateString('es-ES')}`}
-                      {filtroTemporal === 'mes' && `🗓️ ${fechaSeleccionada.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`}
+                      📊 Tipo de período:
+                    </label>
+                    <div style={{
+                      display: 'flex',
+                      gap: '0.5rem',
+                      flexWrap: 'wrap'
+                    }}>
+                      {[
+                        { value: 'dia', label: 'Día', icon: '📅' },
+                        { value: 'semana', label: 'Semana', icon: '📆' },
+                        { value: 'mes', label: 'Mes', icon: '🗓️' }
+                      ].map(periodo => (
+                        <button
+                          key={periodo.value}
+                          onClick={() => setFiltroTemporal(periodo.value)}
+                          style={{
+                            padding: '0.75rem 1rem',
+                            borderRadius: '0.75rem',
+                            border: '1px solid',
+                            borderColor: filtroTemporal === periodo.value ? 'transparent' : '#cbd5e1',
+                            background: filtroTemporal === periodo.value ? 'linear-gradient(135deg, #ec4899, #be185d)' : 'white',
+                            color: filtroTemporal === periodo.value ? 'white' : '#475569',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          <span>{periodo.icon}</span>
+                          {periodo.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Selector de fecha específica */}
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#475569',
+                      marginBottom: '0.5rem'
+                    }}>
+                      🗓️ Fecha específica:
+                    </label>
+                    <input
+                      type={filtroTemporal === 'mes' ? 'month' : filtroTemporal === 'semana' ? 'week' : 'date'}
+                      value={
+                        filtroTemporal === 'mes'
+                          ? `${fechaSeleccionada.getFullYear()}-${String(fechaSeleccionada.getMonth() + 1).padStart(2, '0')}`
+                          : filtroTemporal === 'semana'
+                            ? (() => {
+                              const year = fechaSeleccionada.getFullYear();
+                              const inicioAno = new Date(year, 0, 1);
+                              const diferenciaDias = Math.floor((fechaSeleccionada - inicioAno) / (24 * 60 * 60 * 1000));
+                              const numeroSemana = Math.ceil((diferenciaDias + inicioAno.getDay() + 1) / 7);
+                              return `${year}-W${String(numeroSemana).padStart(2, '0')}`;
+                            })()
+                            : fechaSeleccionada.toISOString().split('T')[0]
+                      }
+                      onChange={(e) => {
+                        if (filtroTemporal === 'mes') {
+                          const [year, month] = e.target.value.split('-');
+                          setFechaSeleccionada(new Date(parseInt(year), parseInt(month) - 1, 1));
+                        } else if (filtroTemporal === 'semana') {
+                          const [year, week] = e.target.value.split('-W');
+                          const primerDiaAno = new Date(parseInt(year), 0, 1);
+                          const diasHastaSemana = (parseInt(week) - 1) * 7;
+                          const nuevaFecha = new Date(primerDiaAno.getTime() + diasHastaSemana * 24 * 60 * 60 * 1000);
+                          setFechaSeleccionada(nuevaFecha);
+                        } else {
+                          setFechaSeleccionada(new Date(e.target.value + 'T12:00:00'));
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        borderRadius: '0.75rem',
+                        border: '1px solid #cbd5e1',
+                        background: 'white',
+                        color: '#475569',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                    />
+                  </div>
+
+                  {/* Botón de resetear a hoy */}
+                  <div>
+                    <button
+                      onClick={() => {
+                        setFechaSeleccionada(new Date());
+                        setFiltroTemporal('mes');
+                      }}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        borderRadius: '0.75rem',
+                        border: '1px solid #e2e8f0',
+                        background: 'white',
+                        color: '#64748b',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem',
+                        width: '100%',
+                        justifyContent: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#f8fafc';
+                        e.target.style.borderColor = '#cbd5e1';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = 'white';
+                        e.target.style.borderColor = '#e2e8f0';
+                      }}
+                    >
+                      <span>🔄</span>
+                      Resetear a Hoy
+                    </button>
+                  </div>
+
+                  {/* Contador de ventas del período */}
+                  <div style={{
+                    padding: '1rem',
+                    background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)',
+                    borderRadius: '0.75rem',
+                    border: '1px solid #0ea5e9',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{
+                      fontSize: '1.5rem',
+                      fontWeight: '800',
+                      color: '#0369a1',
+                      marginBottom: '0.25rem'
+                    }}>
+                      {obtenerVentasFiltradas().length}
+                    </div>
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: '#0284c7',
+                      fontWeight: '600'
+                    }}>
+                      ventas en período
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tarjetas de métricas principales - 5 tarjetas */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '1.5rem',
+              marginBottom: '2rem'
+            }}>
+              {/* Ganancias Netas */}
+              <div style={{
+                background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                borderRadius: '1.5rem',
+                padding: '2rem',
+                color: 'white',
+                boxShadow: '0 10px 25px rgba(34, 197, 94, 0.3)'
+              }}>
+                <h3 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '700',
+                  marginBottom: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  💰 Ganancias Netas
+                </h3>
+                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }}>
+                  Q{formatPrice(estadisticas.gananciasTotal)}
+                </p>
+                <p style={{ opacity: 0.9, fontSize: '0.875rem' }}>
+                  Total de {estadisticas.totalVentas} ventas
+                </p>
+              </div>
+
+              {/* NUEVA: Ventas Netas (Ingresos Brutos) */}
+              <div style={{
+                background: 'linear-gradient(135deg, #06b6d4, #0891b2)',
+                borderRadius: '1.5rem',
+                padding: '2rem',
+                color: 'white',
+                boxShadow: '0 10px 25px rgba(6, 182, 212, 0.3)'
+              }}>
+                <h3 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '700',
+                  marginBottom: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  💵 Ventas Netas
+                </h3>
+                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }}>
+                  Q{formatPrice(estadisticas.ingresosBrutos)}
+                </p>
+                <p style={{ opacity: 0.9, fontSize: '0.875rem' }}>
+                  Ingresos totales del período
+                </p>
+              </div>
+
+              {/* Unidades Vendidas */}
+              <div style={{
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                borderRadius: '1.5rem',
+                padding: '2rem',
+                color: 'white',
+                boxShadow: '0 10px 25px rgba(59, 130, 246, 0.3)'
+              }}>
+                <h3 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '700',
+                  marginBottom: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  📈 Unidades Vendidas
+                </h3>
+                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }}>
+                  {estadisticas.productosVendidos}
+                </p>
+                <p style={{ opacity: 0.9, fontSize: '0.875rem' }}>
+                  Conjuntos: {estadisticas.totalConjuntosVendidos}
+                </p>
+              </div>
+
+              {/* Stock Total */}
+              <div style={{
+                background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                borderRadius: '1.5rem',
+                padding: '2rem',
+                color: 'white',
+                boxShadow: '0 10px 25px rgba(139, 92, 246, 0.3)'
+              }}>
+                <h3 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '700',
+                  marginBottom: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  📦 Stock Total
+                </h3>
+                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }}>
+                  {estadisticas.productosEnStock}
+                </p>
+                <p style={{
+                  opacity: 0.9,
+                  fontSize: '0.875rem',
+                  color: estadisticas.productosSinStock > 0 ? '#fbbf24' : 'inherit'
+                }}>
+                  Sin stock: {estadisticas.productosSinStock}
+                </p>
+              </div>
+
+              {/* Margen Promedio */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                borderRadius: '1.5rem',
+                padding: '2rem',
+                color: 'white',
+                boxShadow: '0 10px 25px rgba(245, 158, 11, 0.3)'
+              }}>
+                <h3 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '700',
+                  marginBottom: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  📊 Margen Promedio
+                </h3>
+                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }}>
+                  {estadisticas.ingresosBrutos > 0 ?
+                    `${((estadisticas.gananciasTotal / estadisticas.ingresosBrutos) * 100).toFixed(1)}%` :
+                    '0%'
+                  }
+                </p>
+                <p style={{ opacity: 0.9, fontSize: '0.875rem' }}>
+                  {estadisticas.totalVentas > 0 ?
+                    `Promedio por venta: Q${formatPrice(estadisticas.ingresosBrutos / estadisticas.totalVentas)}` :
+                    'No hay ventas registradas'
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Gráficas */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))',
+              gap: '2rem',
+              marginBottom: '2rem'
+            }}>
+              {/* Evolución de ventas - Datos simulados basados en ventas reales */}
+              <div style={{
+                background: 'white',
+                borderRadius: '1.5rem',
+                padding: '2rem',
+                boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+                border: '1px solid #e2e8f0'
+              }}>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', color: '#1e293b' }}>
+                  📈 Evolución de Ventas (Últimos 7 días)
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={(() => {
+                    // Generar datos de los últimos 7 días basados en ventas reales
+                    const datos = [];
+                    const hoy = new Date();
+
+                    for (let i = 6; i >= 0; i--) {
+                      const fecha = new Date(hoy);
+                      fecha.setDate(hoy.getDate() - i);
+
+                      const ventasDelDia = obtenerTodasLasVentas().filter(v => {
+                        const fechaVenta = new Date(v.fecha);
+                        return fechaVenta.toDateString() === fecha.toDateString();
+                      });
+
+                      const gananciasDelDia = ventasDelDia.reduce((acc, v) => acc + (v.gananciaTotal || 0), 0);
+
+                      datos.push({
+                        fecha: fecha.toLocaleDateString('es-GT', { weekday: 'short', day: 'numeric' }),
+                        ventas: ventasDelDia.length,
+                        ganancias: gananciasDelDia
+                      });
+                    }
+
+                    return datos;
+                  })()}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="fecha" stroke="#64748b" />
+                    <YAxis stroke="#64748b" />
+                    <Tooltip
+                      contentStyle={{
+                        background: 'white',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '0.75rem',
+                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="ganancias"
+                      stroke="#ec4899"
+                      fill="#ec4899"
+                      fillOpacity={0.3}
+                      name="Ganancias (Q)"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="ventas"
+                      stroke="#3b82f6"
+                      strokeWidth={3}
+                      dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                      name="Número de Ventas"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Productos más vendidos */}
+              <div style={{
+                background: 'white',
+                borderRadius: '1.5rem',
+                padding: '2rem',
+                boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+                border: '1px solid #e2e8f0'
+              }}>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', color: '#1e293b' }}>
+                  🏆 Top 5 Productos Más Vendidos
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={obtenerProductosMasVendidos().slice(0, 5).map(p => ({
+                    nombre: p.nombre.length > 15 ? p.nombre.substring(0, 15) + '...' : p.nombre,
+                    cantidad: p.cantidadVendida
+                  }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="nombre" stroke="#64748b" angle={-45} textAnchor="end" height={100} />
+                    <YAxis stroke="#64748b" />
+                    <Tooltip
+                      contentStyle={{
+                        background: 'white',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '0.75rem',
+                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <Bar
+                      dataKey="cantidad"
+                      fill="#22c55e"
+                      radius={[4, 4, 0, 0]}
+                      name="Unidades Vendidas"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Estado del inventario */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+              gap: '2rem',
+              marginBottom: '2rem'
+            }}>
+              <div style={{
+                background: 'white',
+                borderRadius: '1.5rem',
+                padding: '2rem',
+                boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+                border: '1px solid #e2e8f0'
+              }}>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', color: '#1e293b' }}>
+                  📦 Estado del Inventario
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { nombre: 'Stock Alto', cantidad: productos.filter(p => p.stock > 20).length, color: '#22c55e' },
+                        { nombre: 'Stock Medio', cantidad: productos.filter(p => p.stock > 5 && p.stock <= 20).length, color: '#f59e0b' },
+                        { nombre: 'Stock Bajo', cantidad: productos.filter(p => p.stock > 0 && p.stock <= 5).length, color: '#ef4444' },
+                        { nombre: 'Sin Stock', cantidad: productos.filter(p => p.stock === 0).length, color: '#6b7280' }
+                      ].filter(item => item.cantidad > 0)}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ nombre, cantidad }) => `${nombre}: ${cantidad}`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="cantidad"
+                    >
+                      {[
+                        { nombre: 'Stock Alto', cantidad: productos.filter(p => p.stock > 20).length, color: '#22c55e' },
+                        { nombre: 'Stock Medio', cantidad: productos.filter(p => p.stock > 5 && p.stock <= 20).length, color: '#f59e0b' },
+                        { nombre: 'Stock Bajo', cantidad: productos.filter(p => p.stock > 0 && p.stock <= 5).length, color: '#ef4444' },
+                        { nombre: 'Sin Stock', cantidad: productos.filter(p => p.stock === 0).length, color: '#6b7280' }
+                      ].filter(item => item.cantidad > 0).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Resumen de rentabilidad */}
+              <div style={{
+                background: 'white',
+                borderRadius: '1.5rem',
+                padding: '2rem',
+                boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+                border: '1px solid #e2e8f0'
+              }}>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', color: '#1e293b' }}>
+                  💡 Resumen de Rentabilidad
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{
+                    padding: '1rem',
+                    background: '#f1f5f9',
+                    borderRadius: '0.75rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{ fontWeight: '600', color: '#475569' }}>Ingresos Brutos:</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
+                      Q{formatPrice(estadisticas.ingresosBrutos)}
+                    </span>
+                  </div>
+                  <div style={{
+                    padding: '1rem',
+                    background: '#dcfce7',
+                    borderRadius: '0.75rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{ fontWeight: '600', color: '#166534' }}>Ganancias Netas:</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#166534' }}>
+                      Q{formatPrice(estadisticas.gananciasTotal)}
+                    </span>
+                  </div>
+                  <div style={{
+                    padding: '1rem',
+                    background: '#fef3c7',
+                    borderRadius: '0.75rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{ fontWeight: '600', color: '#92400e' }}>Margen de Ganancia:</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#92400e' }}>
+                      {estadisticas.ingresosBrutos > 0 ?
+                        `${((estadisticas.gananciasTotal / estadisticas.ingresosBrutos) * 100).toFixed(1)}%` :
+                        '0%'
+                      }
+                    </span>
+                  </div>
+                  <div style={{
+                    padding: '1rem',
+                    background: '#e0e7ff',
+                    borderRadius: '0.75rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{ fontWeight: '600', color: '#3730a3' }}>Venta Promedio:</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3730a3' }}>
+                      Q{estadisticas.totalVentas > 0 ? formatPrice(estadisticas.gananciasTotal / estadisticas.totalVentas) : '0.00'}
                     </span>
                   </div>
                 </div>
-
-                {/* Selector optimizado */}
-                <div style={{
-                  padding: '2rem',
-                  background: 'var(--neutral-50)'
-                }}>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                    gap: '1.5rem'
-                  }}>
-                    {/* Selectores de período */}
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '1rem'
-                    }}>
-                      <h3 style={{
-                        fontSize: '1rem',
-                        fontWeight: '600',
-                        color: 'var(--neutral-700)',
-                        margin: 0,
-                        marginBottom: '0.5rem'
-                      }}>
-                        Período de análisis:
-                      </h3>
-
-                      <div style={{
-                        display: 'flex',
-                        gap: '0.5rem',
-                        flexWrap: 'wrap'
-                      }}>
-                        <button
-                          onClick={() => {
-                            setFiltroTemporal('dia');
-                            setFechaSeleccionada(new Date());
-                          }}
-                          style={{
-                            padding: '0.75rem 1rem',
-                            background: filtroTemporal === 'dia' ? 'var(--gradient-primary)' : 'white',
-                            color: filtroTemporal === 'dia' ? 'white' : 'var(--neutral-700)',
-                            border: '1px solid',
-                            borderColor: filtroTemporal === 'dia' ? 'transparent' : 'var(--neutral-300)',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem'
-                          }}
-                        >
-                          📅 Hoy
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setFiltroTemporal('semana');
-                            setFechaSeleccionada(new Date());
-                          }}
-                          style={{
-                            padding: '0.75rem 1rem',
-                            background: filtroTemporal === 'semana' ? 'var(--gradient-primary)' : 'white',
-                            color: filtroTemporal === 'semana' ? 'white' : 'var(--neutral-700)',
-                            border: '1px solid',
-                            borderColor: filtroTemporal === 'semana' ? 'transparent' : 'var(--neutral-300)',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem'
-                          }}
-                        >
-                          📆 Semana
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setFiltroTemporal('mes');
-                            setFechaSeleccionada(new Date());
-                          }}
-                          style={{
-                            padding: '0.75rem 1rem',
-                            background: filtroTemporal === 'mes' ? 'var(--gradient-primary)' : 'white',
-                            color: filtroTemporal === 'mes' ? 'white' : 'var(--neutral-700)',
-                            border: '1px solid',
-                            borderColor: filtroTemporal === 'mes' ? 'transparent' : 'var(--neutral-300)',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem'
-                          }}
-                        >
-                          🗓️ Mes
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Selector de fecha personalizada */}
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '1rem'
-                    }}>
-                      <h3 style={{
-                        fontSize: '1rem',
-                        fontWeight: '600',
-                        color: 'var(--neutral-700)',
-                        margin: 0,
-                        marginBottom: '0.5rem'
-                      }}>
-                        Fecha específica:
-                      </h3>
-
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem'
-                      }}>
-                        <input
-                          type={filtroTemporal === 'mes' ? 'month' : 'date'}
-                          value={filtroTemporal === 'mes'
-                            ? `${fechaSeleccionada.getFullYear()}-${String(fechaSeleccionada.getMonth() + 1).padStart(2, '0')}`
-                            : fechaSeleccionada.toISOString().split('T')[0]
-                          }
-                          onChange={(e) => {
-                            if (filtroTemporal === 'mes') {
-                              const [year, month] = e.target.value.split('-');
-                              const newDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-                              setFechaSeleccionada(newDate);
-                            } else {
-                              const newDate = new Date(e.target.value + 'T12:00:00');
-                              setFechaSeleccionada(newDate);
-                            }
-                          }}
-                          style={{
-                            padding: '0.75rem',
-                            borderRadius: '0.5rem',
-                            border: '1px solid var(--neutral-300)',
-                            background: 'white',
-                            fontSize: '0.875rem',
-                            fontWeight: '500',
-                            flex: 1
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Métricas resumidas con datos filtrados */}
-              <div style={estadisticasMetricsStyle}>
-                <div style={estadisticaCardStyle}>
-                  <h3 style={estadisticaCardTitleStyle}>💰 Rendimiento Financiero</h3>
-                  <div style={estadisticaCardContentStyle}>
-                    <div style={estadisticaItemStyle}>
-                      <span style={estadisticaLabelStyle}>Ingresos Brutos:</span>
-                      <span style={estadisticaValueStyle}>Q{formatPrice(calcularEstadisticas().ingresosBrutos)}</span>
-                    </div>
-                    <div style={estadisticaItemStyle}>
-                      <span style={estadisticaLabelStyle}>Ganancias Netas:</span>
-                      <span style={{ ...estadisticaValueStyle, color: '#22c55e' }}>Q{formatPrice(calcularEstadisticas().gananciasTotal)}</span>
-                    </div>
-                    <div style={estadisticaItemStyle}>
-                      <span style={estadisticaLabelStyle}>Margen de Ganancia:</span>
-                      <span style={{ ...estadisticaValueStyle, color: '#3b82f6' }}>
-                        {calcularEstadisticas().ingresosBrutos > 0
-                          ? ((calcularEstadisticas().gananciasTotal / calcularEstadisticas().ingresosBrutos) * 100).toFixed(1)
-                          : 0}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={estadisticaCardStyle}>
-                  <h3 style={estadisticaCardTitleStyle}>📈 Volumen de Ventas</h3>
-                  <div style={estadisticaCardContentStyle}>
-                    <div style={estadisticaItemStyle}>
-                      <span style={estadisticaLabelStyle}>Ventas en Período:</span>
-                      <span style={estadisticaValueStyle}>{calcularEstadisticas().totalVentas}</span>
-                    </div>
-                    <div style={estadisticaItemStyle}>
-                      <span style={estadisticaLabelStyle}>Productos Vendidos:</span>
-                      <span style={{ ...estadisticaValueStyle, color: '#8b5cf6' }}>{calcularEstadisticas().productosVendidos}</span>
-                    </div>
-                    <div style={estadisticaItemStyle}>
-                      <span style={estadisticaLabelStyle}>Promedio por Venta:</span>
-                      <span style={{ ...estadisticaValueStyle, color: '#f59e0b' }}>
-                        Q{calcularEstadisticas().totalVentas > 0 ? formatPrice(calcularEstadisticas().ingresosBrutos / calcularEstadisticas().totalVentas) : '0.00'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Gráficas intuitivas */}
-              <div style={graficasContainerStyle}>
-                {/* Gráfica de ventas, ingresos y ganancias */}
-                {/* Gráfica de ingresos y ganancias */}
-                <div style={graficaCardStyle}>
-                  <h3 style={graficaTitleStyle}>
-                    💰 Evolución de Ingresos y Ganancias
-                  </h3>
-                  <div style={graficaContentStyle}>
-                    {obtenerDatosGraficas().datosVentas.length > 0 ? (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'end',
-                        gap: '1.5rem',
-                        height: '280px',
-                        width: '100%',
-                        padding: '1rem 0'
-                      }}>
-                        {obtenerDatosGraficas().datosVentas.map((dato, index) => {
-                          const maxIngresos = Math.max(...obtenerDatosGraficas().datosVentas.map(d => d.ingresos));
-                          const maxGanancias = Math.max(...obtenerDatosGraficas().datosVentas.map(d => d.ganancias));
-
-                          return (
-                            <div key={index} style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              flex: 1,
-                              height: '100%',
-                              gap: '0.5rem'
-                            }}>
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'end',
-                                gap: '8px',
-                                height: '200px',
-                                justifyContent: 'center'
-                              }}>
-                                {/* Barra de Ingresos */}
-                                <div style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}>
-                                  <div
-                                    style={{
-                                      width: '24px',
-                                      height: `${maxIngresos > 0 ? (dato.ingresos / maxIngresos) * 180 : 2}px`,
-                                      background: 'linear-gradient(180deg, #10b981, #047857)',
-                                      borderRadius: '4px 4px 0 0',
-                                      minHeight: '2px',
-                                      transition: 'all 0.3s ease'
-                                    }}
-                                    title={`Ingresos: Q${dato.ingresos.toFixed(2)}`}
-                                  ></div>
-                                  <span style={{
-                                    fontSize: '0.65rem',
-                                    fontWeight: '600',
-                                    color: '#047857',
-                                    textAlign: 'center'
-                                  }}>
-                                    Q{dato.ingresos.toFixed(0)}
-                                  </span>
-                                </div>
-
-                                {/* Barra de Ganancias */}
-                                <div style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}>
-                                  <div
-                                    style={{
-                                      width: '24px',
-                                      height: `${maxGanancias > 0 ? (dato.ganancias / maxGanancias) * 180 : 2}px`,
-                                      background: 'linear-gradient(180deg, #f59e0b, #d97706)',
-                                      borderRadius: '4px 4px 0 0',
-                                      minHeight: '2px',
-                                      transition: 'all 0.3s ease'
-                                    }}
-                                    title={`Ganancias: Q${dato.ganancias.toFixed(2)}`}
-                                  ></div>
-                                  <span style={{
-                                    fontSize: '0.65rem',
-                                    fontWeight: '600',
-                                    color: '#d97706',
-                                    textAlign: 'center'
-                                  }}>
-                                    Q{dato.ganancias.toFixed(0)}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div style={{
-                                fontSize: '0.75rem',
-                                color: 'var(--neutral-600)',
-                                textAlign: 'center',
-                                fontWeight: '500',
-                                transform: 'rotate(-15deg)',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {dato.fecha}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div style={noDataStyle}>
-                        <span style={noDataIconStyle}>💰</span>
-                        <p style={noDataTextStyle}>No hay datos financieros para el período seleccionado</p>
-                      </div>
-                    )}
-
-                    {/* Leyenda mejorada */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      gap: '2rem',
-                      marginTop: '1.5rem',
-                      padding: '1rem',
-                      background: 'var(--neutral-50)',
-                      borderRadius: '0.75rem',
-                      border: '1px solid var(--neutral-200)'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem'
-                      }}>
-                        <div style={{
-                          width: '16px',
-                          height: '16px',
-                          background: 'linear-gradient(135deg, #10b981, #047857)',
-                          borderRadius: '4px',
-                          boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
-                        }}></div>
-                        <span style={{
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          color: 'var(--neutral-700)'
-                        }}>
-                          Ingresos Brutos
-                        </span>
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem'
-                      }}>
-                        <div style={{
-                          width: '16px',
-                          height: '16px',
-                          background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                          borderRadius: '4px',
-                          boxShadow: '0 2px 4px rgba(245, 158, 11, 0.3)'
-                        }}></div>
-                        <span style={{
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          color: 'var(--neutral-700)'
-                        }}>
-                          Ganancias Netas
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-
-
-                {/* Gráfica de productos más vendidos */}
-                <div style={graficaCardStyle}>
-                  <h3 style={graficaTitleStyle}>
-                    🏆 Top 5 Productos Más Vendidos
-                  </h3>
-                  <div style={graficaContentStyle}>
-                    {obtenerDatosGraficas().topProductos.length > 0 ? (
-                      <div style={topProductsChartStyle}>
-                        {obtenerDatosGraficas().topProductos.map((producto, index) => (
-                          <div key={index} style={productChartItemStyle}>
-                            <div style={productRankStyle}>#{index + 1}</div>
-                            <div style={productNameChartStyle}>{producto.nombre}</div>
-                            <div style={productBarContainerStyle}>
-                              <div
-                                style={{
-                                  ...productBarStyle,
-                                  width: `${(producto.cantidad / obtenerDatosGraficas().topProductos[0].cantidad) * 100}%`,
-                                  background: `linear-gradient(90deg, ${['#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'][index]}, ${['#d97706', '#16a34a', '#1d4ed8', '#7c3aed', '#db2777'][index]})`
-                                }}
-                              ></div>
-                            </div>
-                            <div style={productQuantityStyle}>{producto.cantidad}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={noDataStyle}>
-                        <span style={noDataIconStyle}>🏆</span>
-                        <p style={noDataTextStyle}>No hay productos vendidos en el período</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
+
+            {/* Tabla de productos con bajo stock */}
+            {productos.filter(p => p.stock <= 5).length > 0 && (
+              <div style={{
+                background: 'white',
+                borderRadius: '1.5rem',
+                padding: '2rem',
+                boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+                border: '1px solid #e2e8f0'
+              }}>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', color: '#1e293b' }}>
+                  ⚠️ Productos con Stock Bajo (≤ 5 unidades)
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f1f5f9' }}>
+                        <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '2px solid #e2e8f0', fontWeight: '700' }}>Producto</th>
+                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '700' }}>Stock</th>
+                        <th style={{ padding: '1rem', textAlign: 'right', borderBottom: '2px solid #e2e8f0', fontWeight: '700' }}>Precio</th>
+                        <th style={{ padding: '1rem', textAlign: 'center', borderBottom: '2px solid #e2e8f0', fontWeight: '700' }}>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productos
+                        .filter(p => p.stock <= 5)
+                        .sort((a, b) => a.stock - b.stock)
+                        .slice(0, 10)
+                        .map((producto) => (
+                          <tr key={producto._id}>
+                            <td style={{ padding: '1rem', borderBottom: '1px solid #e2e8f0', fontWeight: '600' }}>{producto.nombre}</td>
+                            <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}>
+                              <span style={{
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '0.5rem',
+                                background: producto.stock === 0 ? '#fee2e2' : producto.stock <= 3 ? '#fef3c7' : '#dcfce7',
+                                color: producto.stock === 0 ? '#dc2626' : producto.stock <= 3 ? '#d97706' : '#16a34a',
+                                fontWeight: '600'
+                              }}>
+                                {producto.stock}
+                              </span>
+                            </td>
+                            <td style={{ padding: '1rem', textAlign: 'right', borderBottom: '1px solid #e2e8f0' }}>
+                              Q{formatPrice(producto.precio)}
+                            </td>
+                            <td style={{ padding: '1rem', textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}>
+                              {producto.stock === 0 ? '🔴 Agotado' : producto.stock <= 3 ? '🟡 Crítico' : '🟢 Bajo'}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1461,18 +2121,49 @@ function AdminPanel() {
                           <td style={tableCellStyle}>
                             <div style={pricesContainerStyle}>
                               <span style={priceCompraStyle}>Compra: Q{formatPrice(producto.precioCompra)}</span>
-                              <span style={priceVentaStyle}>Venta: Q{formatPrice(producto.precioVenta)}</span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <span style={priceVentaStyle}>Venta: Q{formatPrice(producto.precioVenta)} c/u</span>
+                                {producto.tieneConjunto && (
+                                  <span style={{
+                                    fontSize: '12px',
+                                    color: '#059669',
+                                    fontWeight: '500',
+                                    background: '#ecfdf5',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    display: 'inline-block'
+                                  }}>
+                                    {producto.nombreConjunto}: Q{formatPrice(producto.precioConjunto)}
+                                    ({producto.unidadesPorConjunto} uds)
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
                           <td style={tableCellStyle}>
-                            <span style={{
-                              ...stockBadgeStyle,
-                              background: producto.stock === 0 ? '#fef2f2' : '#f0fdf4',
-                              color: producto.stock === 0 ? '#dc2626' : '#166534',
-                              borderColor: producto.stock === 0 ? '#fecaca' : '#bbf7d0'
-                            }}>
-                              {producto.stock === 0 ? '⚠️ Agotado' : `✅ ${producto.stock}`}
-                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <span style={{
+                                ...stockBadgeStyle,
+                                background: producto.stock === 0 ? '#fef2f2' : '#f0fdf4',
+                                color: producto.stock === 0 ? '#dc2626' : '#166534',
+                                borderColor: producto.stock === 0 ? '#fecaca' : '#bbf7d0'
+                              }}>
+                                {producto.stock === 0 ? 'Sin stock' : `${producto.stock} unidades`}
+                              </span>
+                              {producto.tieneConjunto && Math.floor((producto.stock || 0) / (producto.unidadesPorConjunto || 1)) > 0 && (
+                                <span style={{
+                                  fontSize: '11px',
+                                  color: '#6b7280',
+                                  fontStyle: 'italic',
+                                  padding: '2px 6px',
+                                  background: '#f3f4f6',
+                                  borderRadius: '4px',
+                                  alignSelf: 'flex-start'
+                                }}>
+                                  + {Math.floor((producto.stock || 0) / (producto.unidadesPorConjunto || 1))} {producto.nombreConjunto?.toLowerCase() || 'conjunto'}(s)
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td style={tableCellStyle}>
                             <div style={actionsContainerStyle}>
@@ -1537,102 +2228,162 @@ function AdminPanel() {
             {orders.length === 0 && !isLoadingOrders ? (
               <div style={emptyStateStyle}>
                 <div style={emptyIconStyle}>📋</div>
-                <h3 style={emptyTitleStyle}>No hay pedidos</h3>
-                <p style={emptySubtitleStyle}>Los pedidos aparecerán aquí cuando los clientes realicen compras</p>
+                <h3 style={emptyTitleStyle}>No hay pedidos registrados</h3>
+                <p style={emptySubtitleStyle}>
+                  Los pedidos de los clientes aparecerán aquí
+                </p>
               </div>
             ) : (
-              <div style={ordersContainerStyle}>
-                {orders.map((order) => (
-                  <div key={order._id} style={orderCardStyle} className="responsive-card fadeIn">
-                    <div style={orderHeaderStyle}>
-                      <div style={orderInfoStyle}>
-                        <h3 style={orderIdStyle}>
-                          Pedido #{order._id ? order._id.substring(0, 8) : 'N/A'}
-                        </h3>
-                        <p style={orderDateStyle}>
-                          {order.fecha ? new Date(order.fecha).toLocaleDateString('es-ES', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
+              <div style={ordersCardsContainerStyle}>
+                {orders.map((pedido) => {
+                  // Detectar si tiene conjuntos
+                  const tieneConjuntos = pedido.productos.some(prod =>
+                    prod.tipoVenta === 'conjunto' ||
+                    prod.nombreConjunto ||
+                    (prod.nombreConjunto === 'Caja')
+                  );
+
+                  return (
+                    <div key={pedido._id} style={orderCardStyle} className="fadeIn">
+                      {/* Header del pedido */}
+                      <div style={orderCardHeaderStyle}>
+                        <div style={orderCardIdSectionStyle}>
+                          <span style={orderIdBadgeStyle}>
+                            #{pedido._id.slice(-8).toUpperCase()}
+                          </span>
+                          <span style={getStatusBadgeStyle(pedido.estado)}>
+                            {pedido.estado === 'confirmado' ? 'Confirmado' :
+                              pedido.estado === 'entregado' ? 'Entregado' :
+                                pedido.estado === 'cancelado' ? 'Cancelado' : 'Pendiente'}
+                          </span>
+                        </div>
+                        <div style={orderCardDateStyle}>
+                          📅 {new Date(pedido.fecha).toLocaleDateString('es-ES')}
+                          <br />
+                          🕐 {new Date(pedido.fecha).toLocaleTimeString('es-ES', {
                             hour: '2-digit',
                             minute: '2-digit'
-                          }) : 'N/A'}
-                        </p>
-                      </div>
-                      <div style={orderStatusContainerStyle}>
-                        <div style={{
-                          ...orderStatusBadgeStyle,
-                          background: getStatusColor(order.estado),
-                          color: 'white'
-                        }}>
-                          <span style={statusIconStyle}>{getStatusIcon(order.estado)}</span>
-                          {order.estado.replace(/_/g, ' ').toUpperCase()}
+                          })}
                         </div>
                       </div>
-                    </div>
 
-                    <div style={orderDetailsStyle}>
-                      <div style={customerInfoStyle}>
-                        <h4 style={customerNameStyle}>
-                          👤 {getUserInfo(order, 'nombre')}
+                      {/* Información del cliente */}
+                      <div style={orderCardClientSectionStyle}>
+                        <div style={orderCardClientHeaderStyle}>
+                          <span style={orderCardClientIconStyle}>👤</span>
+                          <span style={orderCardClientNameStyle}>
+                            {pedido.userId?.nombre || 'N/A'}
+                          </span>
+                        </div>
+                        <span style={orderCardClientEmailStyle}>
+                          📧 {pedido.userId?.correo || 'N/A'}
+                        </span>
+                      </div>
+
+                      {/* Productos */}
+                      <div style={orderCardProductsSectionStyle}>
+                        <h4 style={orderCardProductsHeaderStyle}>
+                          📦 Productos ({pedido.productos.length})
+                          {tieneConjuntos && (
+                            <span style={orderCardConjuntosIndicatorStyle}>
+                              🎁 Incluye conjuntos
+                            </span>
+                          )}
                         </h4>
-                        <p style={customerEmailStyle}>
-                          📧 {getUserInfo(order, 'correo')}
-                        </p>
-                      </div>
+                        <div style={orderCardProductsListStyle}>
+                          {pedido.productos.map((prod, idx) => {
+                            // Detectar si es conjunto
+                            const esConjunto = prod.tipoVenta === 'conjunto' ||
+                              prod.nombreConjunto ||
+                              prod.nombreConjunto === 'Caja';
 
-                      <div style={orderProductsStyle}>
-                        <h4 style={productsHeaderStyle}>
-                          📦 Productos ({order.productos ? order.productos.length : 0})
-                        </h4>
-                        <div style={productListStyle}>
-                          {order.productos && order.productos.map((item, idx) => (
-                            <div key={idx} style={orderProductItemStyle}>
-                              <span style={productItemNameStyle}>{item.nombre}</span>
-                              <span style={productItemQuantityStyle}>x{item.cantidad}</span>
-                            </div>
-                          ))}
+                            const productoOriginal = productos.find(p => p._id === prod.productId) || {};
+                            const unidadesPorConjunto = prod.unidadesPorConjunto ||
+                              productoOriginal.unidadesPorConjunto || 10;
+                            const nombreConjunto = prod.nombreConjunto ||
+                              productoOriginal.nombreConjunto || 'Caja';
+
+                            return (
+                              <div key={idx} style={orderCardProductItemStyle}>
+                                <div style={orderCardProductInfoStyle}>
+                                  <span style={orderCardProductNameStyle}>{prod.nombre}</span>
+                                  <div style={orderCardProductQuantityContainerStyle}>
+                                    {esConjunto ? (
+                                      <>
+                                        <span style={orderCardProductConjuntoStyle}>
+                                          🎁 {prod.cantidadOriginal || Math.floor(prod.cantidad / unidadesPorConjunto)} {nombreConjunto}(s)
+                                        </span>
+                                        <span style={orderCardProductUnidadesStyle}>
+                                          📦 {prod.cantidad} unidades totales ({unidadesPorConjunto} c/u)
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <span style={orderCardProductUnidadesIndividualStyle}>
+                                        📦 {prod.cantidad} unidades individuales
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div style={orderCardProductPriceStyle}>
+                                  Q{formatPrice((prod.precioVenta || 0) * (prod.cantidadOriginal || prod.cantidad))}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
 
-                      <div style={orderFooterStyle}>
-                        <div style={orderTotalStyle}>
-                          <span style={totalLabelStyle}>Total:</span>
-                          <span style={totalAmountStyle}>Q{formatPrice(order.total)}</span>
+                      {/* Total y acciones */}
+                      {/* Total y acciones */}
+                      <div style={orderCardFooterStyle}>
+                        <div style={orderCardTotalSectionStyle}>
+                          <div style={orderCardTotalStyle}>
+                            <strong>Total: Q{formatPrice(pedido.total)}</strong>
+                          </div>
+                          <div style={orderCardGananciaStyle}>
+                            💰 Ganancia: Q{formatPrice(pedido.gananciaTotal || 0)}
+                          </div>
                         </div>
+                        <div style={orderCardActionsSectionStyle}>
+                          {/* Combo box para cambiar estado */}
+                          <div style={orderCardStatusSectionStyle}>
+                            <label style={orderCardStatusLabelStyle}>Estado:</label>
+                            <select
+                              value={pedido.estado}
+                              onChange={(e) => handleUpdateOrderStatus(pedido._id, e.target.value)}
+                              style={orderCardStatusSelectStyle}
+                              disabled={pedido.estado === 'entregado' || pedido.estado === 'cancelado'}
+                            >
+                              <option value="pendiente">⏳ Pendiente</option>
+                              <option value="confirmado">✅ Confirmado</option>
+                              <option value="entregado">📦 Entregado</option>
+                              <option value="cancelado">❌ Cancelado</option>
+                            </select>
+                          </div>
 
-                        <div style={statusSelectContainerStyle}>
-                          <label style={selectLabelStyle}>Estado:</label>
-                          <select
-                            value={order.estado}
-                            onChange={(e) => handleUpdateOrderStatus(order._id, e.target.value)}
-                            disabled={order.estado === 'cancelado' || order.estado === 'entregado'}
-                            style={{
-                              ...statusSelectStyle,
-                              opacity: (order.estado === 'cancelado' || order.estado === 'entregado') ? 0.6 : 1,
-                              cursor: (order.estado === 'cancelado' || order.estado === 'entregado') ? 'not-allowed' : 'pointer'
-                            }}
+                          {/* Botón de eliminar */}
+                          <button
+                            onClick={() => handleDeleteOrder(pedido._id)}
+                            style={orderCardDeleteButtonStyle}
                           >
-                            {orderStatuses.map(status => (
-                              <option key={status} value={status}>
-                                {status.replace(/_/g, ' ').toUpperCase()}
-                              </option>
-                            ))}
-                          </select>
+                            🗑️ Eliminar
+                          </button>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-
-                <Pagination
-                  currentPage={ordersPagination.currentPage}
-                  totalPages={ordersPagination.totalPages}
-                  hasNextPage={ordersPagination.hasNextPage}
-                  hasPrevPage={ordersPagination.hasPrevPage}
-                  onPageChange={handleOrdersPageChange}
-                />
+                  );
+                })}
               </div>
+            )}
+
+            {orders.length > 0 && (
+              <Pagination
+                currentPage={ordersPagination.currentPage}
+                totalPages={ordersPagination.totalPages}
+                hasNextPage={ordersPagination.hasNextPage}
+                hasPrevPage={ordersPagination.hasPrevPage}
+                onPageChange={handleOrdersPageChange}
+              />
             )}
           </div>
         )}
@@ -1642,12 +2393,600 @@ function AdminPanel() {
 }
 
 // ===== TODOS LOS ESTILOS CSS =====
+// Estilos para el combo box de estados
+const orderCardStatusSectionStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px',
+  minWidth: '140px'
+};
+
+const orderCardStatusLabelStyle = {
+  fontSize: '0.8rem',
+  fontWeight: '600',
+  color: '#374151'
+};
+
+const orderCardStatusSelectStyle = {
+  padding: '8px 12px',
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  border: '2px solid #e5e7eb',
+  borderRadius: '8px',
+  backgroundColor: 'white',
+  color: '#374151',
+  cursor: 'pointer',
+  transition: 'all 0.2s ease'
+};
+
+
+// Estilos responsive para pedidos
+const ordersCardsContainerStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1.5rem',
+  marginBottom: '2rem'
+};
+
+
+const orderCardHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  marginBottom: '1rem',
+  paddingBottom: '1rem',
+  borderBottom: '1px solid #f3f4f6',
+  flexWrap: 'wrap',
+  gap: '1rem'
+};
+
+const orderCardIdSectionStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.75rem',
+  flexWrap: 'wrap'
+};
+
+const orderIdBadgeStyle = {
+  fontFamily: 'monospace',
+  fontSize: '0.9rem',
+  fontWeight: '700',
+  color: '#6366f1',
+  backgroundColor: '#f0f9ff',
+  padding: '6px 12px',
+  borderRadius: '8px',
+  border: '1px solid #dbeafe'
+};
+
+const orderCardDateStyle = {
+  fontSize: '0.85rem',
+  color: '#6b7280',
+  textAlign: 'right',
+  lineHeight: '1.3'
+};
+
+const orderCardClientSectionStyle = {
+  marginBottom: '1.5rem',
+  padding: '1rem',
+  backgroundColor: '#f9fafb',
+  borderRadius: '8px',
+  border: '1px solid #f3f4f6'
+};
+
+const orderCardClientHeaderStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  marginBottom: '0.5rem'
+};
+
+const orderCardClientIconStyle = {
+  fontSize: '1.2rem'
+};
+
+const orderCardClientNameStyle = {
+  fontSize: '1rem',
+  fontWeight: '600',
+  color: '#1f2937'
+};
+
+const orderCardClientEmailStyle = {
+  fontSize: '0.85rem',
+  color: '#1f2937'
+};
+
+const orderCardProductsSectionStyle = {
+  marginBottom: '1.5rem'
+};
+
+const orderCardProductsHeaderStyle = {
+  fontSize: '1rem',
+  fontWeight: '600',
+  color: '#1f2937',
+  marginBottom: '1rem',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.75rem',
+  flexWrap: 'wrap'
+};
+
+const orderCardConjuntosIndicatorStyle = {
+  fontSize: '0.8rem',
+  background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+  color: 'white',
+  padding: '4px 8px',
+  borderRadius: '6px',
+  fontWeight: '600'
+};
+
+const orderCardProductsListStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem'
+};
+
+const orderCardProductItemStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  padding: '1rem',
+  backgroundColor: '#ffffff',
+  borderRadius: '8px',
+  border: '1px solid #e5e7eb',
+  gap: '1rem'
+};
+
+const orderCardProductInfoStyle = {
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem'
+};
+
+const orderCardProductNameStyle = {
+  fontSize: '0.95rem',
+  fontWeight: '600',
+  color: '#1f2937'
+};
+
+const orderCardProductQuantityContainerStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2px'
+};
+
+const orderCardProductConjuntoStyle = {
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  color: '#8b5cf6'
+};
+
+const orderCardProductUnidadesStyle = {
+  fontSize: '0.75rem',
+  color: '#1f2937'
+};
+
+const orderCardProductUnidadesIndividualStyle = {
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  color: '#059669'
+};
+
+const orderCardProductPriceStyle = {
+  fontSize: '0.9rem',
+  fontWeight: '700',
+  color: '#059669',
+  textAlign: 'right'
+};
+
+const orderCardFooterStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-end',
+  paddingTop: '1rem',
+  borderTop: '1px solid #f3f4f6',
+  gap: '1rem',
+  flexWrap: 'wrap'
+};
+
+const orderCardTotalSectionStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px'
+};
+
+const orderCardTotalStyle = {
+  fontSize: '1.1rem',
+  fontWeight: '700',
+  color: '#1f2937'
+};
+
+const orderCardGananciaStyle = {
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  color: '#22c55e'
+};
+
+const orderCardActionsSectionStyle = {
+  display: 'flex',
+  gap: '0.5rem',
+  flexWrap: 'wrap'
+};
+
+const orderCardDeliverButtonStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px',
+  padding: '8px 16px',
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+  color: 'white',
+  border: 'none',
+  borderRadius: '8px',
+  cursor: 'pointer',
+  transition: 'all 0.2s ease'
+};
+
+const orderCardDeleteButtonStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px',
+  padding: '8px 16px',
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+  color: 'white',
+  border: 'none',
+  borderRadius: '8px',
+  cursor: 'pointer',
+  transition: 'all 0.2s ease'
+};
+
+
+
+// Estilos para filtros y grupos
+const filtroGroupRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px'
+};
+
+const selectFiltroRedesignedStyle = {
+  padding: '8px 12px',
+  borderRadius: '8px',
+  border: '1px solid #d1d5db',
+  fontSize: '0.9rem',
+  backgroundColor: 'white',
+  color: '#374151'
+};
+
+// Estilos para tabla de estadísticas
+const estadisticasTableContainerRedesignedStyle = {
+  background: 'white',
+  borderRadius: '12px',
+  padding: '1.5rem',
+  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+  border: '1px solid #e5e7eb',
+  marginBottom: '2rem'
+};
+
+const estadisticasTableTitleRedesignedStyle = {
+  fontSize: '1.2rem',
+  fontWeight: '700',
+  color: '#1f2937',
+  marginBottom: '1rem',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem'
+};
+
+const estadisticasTableWrapperRedesignedStyle = {
+  overflowX: 'auto'
+};
+
+const estadisticasTableRedesignedStyle = {
+  width: '100%',
+  borderCollapse: 'collapse'
+};
+
+const estadisticasTableHeaderRedesignedStyle = {
+  backgroundColor: '#f9fafb'
+};
+
+const estadisticasTableHeaderCellRedesignedStyle = {
+  padding: '12px',
+  textAlign: 'left',
+  fontWeight: '600',
+  color: '#1f2937',
+  fontSize: '0.9rem',
+  borderBottom: '1px solid #e5e7eb'
+};
+
+const estadisticasTableRowRedesignedStyle = {
+  borderBottom: '1px solid #f3f4f6'
+};
+
+const estadisticasTableCellRedesignedStyle = {
+  padding: '12px',
+  fontSize: '0.9rem',
+  color: '#1f2937'
+};
+
+
+// Función para badge de estado (para pedidos)
+const getStatusBadgeStyle = (estado) => {
+  const baseStyle = {
+    fontSize: '0.8rem',
+    fontWeight: '600',
+    padding: '4px 8px',
+    borderRadius: '6px',
+    textTransform: 'capitalize'
+  };
+
+  switch (estado) {
+    case 'confirmado':
+      return { ...baseStyle, background: '#dbeafe', color: '#1e40af' };
+    case 'entregado':
+      return { ...baseStyle, background: '#dcfce7', color: '#166534' };
+    case 'cancelado':
+      return { ...baseStyle, background: '#fee2e2', color: '#dc2626' };
+    default:
+      return { ...baseStyle, background: '#f3f4f6', color: '#6b7280' };
+  }
+};
+
+// Estilos para información de cliente y pedido
+
+
+const dateStyle = {
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  color: '#374151'
+};
+
+const timeStyle = {
+  fontSize: '0.8rem',
+  color: '#1f2937',
+  display: 'block',
+  marginTop: '2px'
+};
+
+const actionButtonsStyle = {
+  display: 'flex',
+  gap: '8px',
+  flexDirection: 'column'
+};
+
+const deliverButtonStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px',
+  padding: '6px 12px',
+  fontSize: '0.8rem',
+  fontWeight: '600',
+  background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+  color: 'white',
+  border: 'none',
+  borderRadius: '6px',
+  cursor: 'pointer'
+};
+
+
+
+
+// Estilos faltantes para corregir los errores
+const profitStyle = {
+  fontSize: '0.8rem',
+  color: '#22c55e',
+  fontWeight: '600',
+  marginTop: '4px',
+  display: 'block'
+};
+
+const filtrosEstadisticasRedesignedStyle = {
+  display: 'flex',
+  gap: '1rem',
+  alignItems: 'center'
+};
+
+const historialMetaRedesignedStyle = {
+  display: 'flex',
+  gap: '1rem',
+  alignItems: 'center',
+  fontSize: '0.85rem',
+  color: '#1f2937',
+  marginTop: '4px'
+};
+
+
+const historialFechaRedesignedStyle = {
+  fontSize: '0.85rem',
+  color: '#1f2937'
+};
+
+const historialClienteRedesignedStyle = {
+  fontSize: '0.85rem',
+  color: '#1f2937'
+};
+
+const historialTotalesRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-end',
+  gap: '4px'
+};
+
+const historialTotalRedesignedStyle = {
+  fontSize: '1.3rem',
+  fontWeight: '800',
+  color: '#1f2937'
+};
+
+const historialGananciaRedesignedStyle = {
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  color: '#22c55e'
+};
+
+const historialProductosContainerRedesignedStyle = {
+  marginBottom: '1rem'
+};
+
+const historialProductosTitleRedesignedStyle = {
+  fontSize: '1rem',
+  fontWeight: '600',
+  color: '#1f2937',
+  marginBottom: '0.75rem'
+};
+
+const historialProductosListRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem'
+};
+
+const historialProductoRedesignedStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  padding: '0.75rem',
+  background: '#f9fafb',
+  borderRadius: '8px',
+  border: '1px solid #f3f4f6'
+};
+
+const historialProductoNombreRedesignedStyle = {
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  color: '#1f2937',
+  marginBottom: '4px'
+};
+
+const historialResumenRedesignedStyle = {
+  display: 'flex',
+  gap: '2rem',
+  paddingTop: '1rem',
+  borderTop: '1px solid #f3f4f6'
+};
+
+const historialResumenItemRedesignedStyle = {
+  display: 'flex',
+  gap: '0.5rem',
+  alignItems: 'center'
+};
+
+const historialResumenLabelRedesignedStyle = {
+  fontSize: '0.85rem',
+  color: '#1f2937',
+  fontWeight: '500'
+};
+
+const historialResumenValueRedesignedStyle = {
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  color: '#1f2937'
+};
+
+const historialResumenGananciaRedesignedStyle = {
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  color: '#22c55e'
+};
+
+
+
+
+// Estilos adicionales para la lógica de conjuntos
+const quantityStatsContainerStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '2px'
+};
+
+const quantityStatsMainStyle = {
+  fontSize: '1.1rem',
+  fontWeight: '700',
+  color: '#1f2937'
+};
+
+const quantityStatsLabelStyle = {
+  fontSize: '0.75rem',
+  color: '#1f2937',
+  fontWeight: '500'
+};
+
+const productNameStatsStyle = {
+  fontWeight: '600',
+  color: '#1f2937',
+  fontSize: '0.9rem'
+};
+
+const rankingNumberStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '24px',
+  height: '24px',
+  backgroundColor: '#f3f4f6',
+  color: '#1f2937',
+  borderRadius: '50%',
+  fontSize: '0.8rem',
+  fontWeight: '600'
+};
+
+const revenueStatsStyle = {
+  fontSize: '1rem',
+  fontWeight: '600',
+  color: '#059669'
+};
+
+const historialProductoDetallesRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2px'
+};
+
+const historialProductoCantidadRedesignedStyle = {
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  color: '#1f2937'
+};
+
+const historialProductoUnidadesRedesignedStyle = {
+  fontSize: '0.75rem',
+  color: '#1f2937',
+  fontStyle: 'italic'
+};
+
+const historialProductoPreciosRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-end',
+  gap: '2px'
+};
+
+const historialProductoPrecioUnitarioRedesignedStyle = {
+  fontSize: '0.75rem',
+  color: '#1f2937'
+};
+
+const historialProductoInfoRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px',
+  flex: 1
+};
+
+
 
 const pageWrapperStyle = {
   minHeight: '100vh',
   background: 'var(--gradient-background)',
   fontFamily: 'var(--font-sans)',
-  paddingBottom: '2rem'
+  paddingBottom: '2rem',
+  paddingTop: '100px'
 };
 
 const heroHeaderStyle = {
@@ -1835,14 +3174,20 @@ const tabIconStyle = {
 };
 
 const tabContentStyle = {
-  animation: 'fadeIn 0.5s ease-out'
+  animation: 'fadeIn 0.5s ease-out',
+  height: '100%',  // Agregar si no está
+  overflow: 'hidden'  // Agregar si no está
 };
 
 // Estilos del Dashboard
 const dashboardGridStyle = {
   display: 'grid',
   gridTemplateColumns: '2fr 1fr',
-  gap: '2rem'
+  gap: '2rem',
+  '@media (max-width: 768px)': {
+    gridTemplateColumns: '1fr',
+    gap: '1rem'
+  }
 };
 
 const metricsContainerStyle = {
@@ -1856,7 +3201,11 @@ const metricsContainerStyle = {
 const metricsGridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-  gap: '1.5rem'
+  gap: '1.5rem',
+  '@media (max-width: 768px)': {
+    gridTemplateColumns: '1fr',
+    gap: '1rem'
+  }
 };
 
 const metricCardStyle = {
@@ -1895,7 +3244,11 @@ const metricValueStyle = {
   fontWeight: '800',
   color: 'var(--neutral-800)',
   marginBottom: '0.25rem',
-  lineHeight: 1
+  lineHeight: 1,
+  wordBreak: 'break-all', // Para números largos
+  '@media (max-width: 768px)': {
+    fontSize: '1.5rem'
+  }
 };
 
 const metricLabelStyle = {
@@ -2173,7 +3526,11 @@ const estadisticasContainerStyle = {
 const estadisticasMetricsStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-  gap: '2rem'
+  gap: '2rem',
+  '@media (max-width: 768px)': {
+    gridTemplateColumns: '1fr',
+    gap: '1rem'
+  }
 };
 
 const estadisticaCardStyle = {
@@ -2243,7 +3600,49 @@ const analisisTitleStyle = {
 const tipoVentasGridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-  gap: '2rem'
+  gap: '2rem',
+  '@media (max-width: 768px)': {
+    gridTemplateColumns: '1fr',
+    gap: '1rem'
+  }
+};
+
+
+// NUEVO - Estilos responsive para pedidos
+const orderCardMobileStyle = {
+  background: 'white',
+  borderRadius: '1rem',
+  padding: '1rem',
+  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+  border: '1px solid var(--neutral-200)',
+  marginBottom: '1rem'
+};
+
+const orderHeaderMobileStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem',
+  marginBottom: '1rem',
+  paddingBottom: '1rem',
+  borderBottom: '1px solid var(--neutral-200)'
+};
+
+const orderInfoRowStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  fontSize: '0.875rem'
+};
+
+const orderProductsMobileStyle = {
+  marginBottom: '1rem'
+};
+
+
+const orderActionsMobileStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem'
 };
 
 const tipoVentaCardStyle = {
@@ -2508,7 +3907,8 @@ const tableHeaderCellStyle = {
 
 const tableRowStyle = {
   borderBottom: '1px solid var(--neutral-200)',
-  transition: 'all 0.2s ease'
+  transition: 'all 0.2s ease',
+  color: '#1f2937'
 };
 
 const tableCellStyle = {
@@ -3186,4 +4586,905 @@ const resumenDescripcionStyle = {
   fontSize: '0.875rem',
   color: 'var(--neutral-600)'
 };
+
+// Estilos específicos del rediseño de pedidos
+const ordersContainerRedesignedStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+  gap: '1.5rem',
+};
+
+const orderCardRedesignedStyle = {
+  background: 'white',
+  borderRadius: '1.5rem',
+  padding: '2rem',
+  boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+  border: '1px solid var(--neutral-200)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1.5rem',
+  transition: 'all 0.3s ease',
+};
+
+const orderHeaderRedesignedStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+};
+
+const orderIdRedesignedStyle = {
+  fontSize: '1.125rem',
+  fontWeight: '700',
+  color: 'var(--neutral-800)',
+};
+
+const orderBodyRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem',
+  paddingBottom: '1.5rem',
+  borderBottom: '1px solid var(--neutral-200)',
+};
+
+const orderDetailRowStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+};
+
+const orderLabelStyle = {
+  fontSize: '0.875rem',
+  fontWeight: '500',
+  color: 'var(--neutral-600)',
+};
+
+const orderValueStyle = {
+  fontSize: '0.875rem',
+  fontWeight: '600',
+  color: 'var(--neutral-800)',
+  textAlign: 'right',
+  wordBreak: 'break-all',
+};
+
+const orderTotalRedesignedStyle = {
+  fontSize: '1.25rem',
+  fontWeight: '800',
+  color: 'var(--primary-600)',
+};
+
+const orderProductsRedesignedStyle = {
+  background: 'var(--neutral-50)',
+  padding: '1rem',
+  borderRadius: '1rem',
+  border: '1px solid var(--neutral-200)',
+};
+
+const productsHeaderRedesignedStyle = {
+  fontSize: '1rem',
+  fontWeight: '600',
+  color: 'var(--neutral-700)',
+  marginBottom: '0.75rem',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+};
+
+const productListRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
+};
+
+const orderProductItemRedesignedStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: '0.5rem 0.75rem',
+  background: 'white',
+  borderRadius: '0.5rem',
+  border: '1px solid var(--neutral-200)',
+};
+
+const productNameRedesignedStyle = {
+  fontSize: '0.875rem',
+  color: 'var(--neutral-700)',
+  fontWeight: '500',
+};
+
+const orderActionsRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem',
+  marginTop: '0.5rem',
+};
+
+const statusSelectRedesignedStyle = (estado) => ({
+  width: '100%',
+  padding: '0.75rem 1rem',
+  borderRadius: '0.75rem',
+  border: '1px solid var(--neutral-300)',
+  background: 'white',
+  color: 'var(--neutral-700)',
+  fontSize: '0.875rem',
+  fontWeight: '500',
+  transition: 'all 0.2s ease',
+  opacity: (estado === 'cancelado' || estado === 'entregado') ? 0.6 : 1,
+  cursor: (estado === 'cancelado' || estado === 'entregado') ? 'not-allowed' : 'pointer',
+});
+
+// Estilos específicos para Historial y Estadísticas
+const historialContainerRedesignedStyle = {
+  background: 'white',
+  borderRadius: '1.5rem',
+  boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+  border: '1px solid var(--neutral-200)',
+  overflow: 'hidden'
+};
+
+const sectionHeaderRedesignedStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: '1.5rem 2rem',
+  background: 'white',
+  borderBottom: '1px solid var(--neutral-200)',
+  gap: '1rem',
+};
+
+const sectionTitleRedesignedStyle = {
+  fontSize: '1.5rem',
+  fontWeight: '700',
+  color: 'var(--neutral-800)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.75rem',
+  margin: 0
+};
+
+const historialStatsRedesignedStyle = {
+  display: 'flex',
+  gap: '1rem',
+  alignItems: 'center',
+  fontSize: '0.875rem',
+  color: 'var(--neutral-600)',
+  flexWrap: 'wrap',
+};
+
+const historialStatRedesignedStyle = {
+  whiteSpace: 'nowrap',
+};
+
+const historialListRedesignedStyle = {
+  padding: '2rem',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1.5rem',
+};
+
+const historialItemRedesignedStyle = {
+  background: 'var(--neutral-50)',
+  borderRadius: '1.5rem',
+  padding: '2rem',
+  border: '1px solid var(--neutral-200)',
+  transition: 'all 0.3s ease',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1.5rem',
+};
+
+const historialHeaderRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+  alignItems: 'flex-start',
+  paddingBottom: '1.5rem',
+  borderBottom: '1px solid var(--neutral-200)',
+  '@media (min-width: 768px)': {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+};
+
+const historialInfoRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
+};
+
+const historialIdTitleRedesignedStyle = {
+  fontSize: '1.25rem',
+  fontWeight: '700',
+  color: 'var(--neutral-800)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  flexWrap: 'wrap',
+};
+
+const tipoVentaBadgeRedesignedStyle = (tipo) => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  padding: '0.5rem 1rem',
+  borderRadius: '1rem',
+  fontSize: '0.875rem',
+  fontWeight: '600',
+  background: tipo === 'fisica' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+  color: 'white',
+  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+});
+
+const historialIdRedesignedStyle = {
+  fontSize: '0.875rem',
+  color: 'var(--neutral-600)',
+  fontWeight: '500',
+};
+
+const historialDateRedesignedStyle = {
+  fontSize: '0.875rem',
+  color: 'var(--neutral-600)',
+  fontWeight: '500',
+};
+
+const historialTotalsRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-end',
+  gap: '0.5rem',
+};
+
+const historialTotalRowRedesignedStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+};
+
+const historialTotalLabelRedesignedStyle = {
+  fontSize: '1rem',
+  fontWeight: '600',
+  color: 'var(--neutral-700)',
+};
+
+const historialTotalAmountRedesignedStyle = {
+  fontSize: '1.5rem',
+  fontWeight: '800',
+  color: 'var(--primary-600)',
+};
+
+const historialGananciaRowRedesignedStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+};
+
+const historialGananciaLabelRedesignedStyle = {
+  fontSize: '0.875rem',
+  fontWeight: '500',
+  color: 'var(--neutral-600)',
+};
+
+const historialGananciaAmountRedesignedStyle = {
+  fontSize: '1rem',
+  fontWeight: '700',
+  color: '#22c55e',
+};
+
+const historialBodyRedesignedStyle = {
+  display: 'grid',
+  gridTemplateColumns: '1fr',
+  gap: '1.5rem',
+  '@media (min-width: 768px)': {
+    gridTemplateColumns: '1fr 2fr',
+  },
+};
+
+const historialClientDetailsRedesignedStyle = {
+  background: 'white',
+  padding: '1.5rem',
+  borderRadius: '1rem',
+  border: '1px solid var(--neutral-200)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem',
+};
+
+const historialDetailsTitleRedesignedStyle = {
+  fontSize: '1rem',
+  fontWeight: '600',
+  color: 'var(--neutral-800)',
+  marginBottom: '0.5rem',
+  paddingBottom: '0.5rem',
+  borderBottom: '1px solid var(--neutral-200)',
+};
+
+const historialDetailsContentRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
+  fontSize: '0.875rem',
+  color: 'var(--neutral-600)',
+};
+
+const historialProductDetailsRedesignedStyle = {
+  background: 'white',
+  padding: '1.5rem',
+  borderRadius: '1rem',
+  border: '1px solid var(--neutral-200)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem',
+};
+
+const historialProductListRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem',
+};
+
+const historialProductItemRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  padding: '0.75rem',
+  background: 'var(--neutral-50)',
+  borderRadius: '0.75rem',
+  border: '1px solid var(--neutral-200)',
+  gap: '0.5rem',
+};
+
+const productInfoRowRedesignedStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+};
+
+const productNameHistorialRedesignedStyle = {
+  fontSize: '0.875rem',
+  fontWeight: '600',
+  color: 'var(--neutral-700)',
+};
+
+const productQuantityHistorialRedesignedStyle = {
+  fontSize: '0.875rem',
+  color: 'var(--primary-600)',
+  fontWeight: '600',
+};
+
+const productPricingRowRedesignedStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  fontSize: '0.75rem',
+  color: 'var(--neutral-500)',
+};
+
+const productPriceHistorialRedesignedStyle = {
+  fontStyle: 'italic',
+};
+
+const productSubtotalHistorialRedesignedStyle = {
+  fontWeight: '600',
+};
+
+// Estilos de Estadísticas
+const estadisticasContainerRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2rem',
+};
+
+const estadisticasHeaderRedesignedStyle = {
+  background: 'white',
+  borderRadius: '1.5rem',
+  boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+  border: '1px solid var(--neutral-200)',
+  padding: '2rem',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1.5rem',
+};
+
+const estadisticasTitleSectionStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
+};
+
+const periodoInfoRedesignedStyle = {
+  fontSize: '0.875rem',
+  fontWeight: '600',
+  color: 'var(--primary-700)',
+  background: 'var(--primary-50)',
+  padding: '0.5rem 1rem',
+  borderRadius: '0.75rem',
+  border: '1px solid var(--primary-200)',
+  alignSelf: 'flex-start',
+};
+
+const filtrosContainerRedesignedStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+  gap: '1.5rem',
+};
+
+const filtrosGrupoRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem',
+};
+
+const labelFiltroRedesignedStyle = {
+  fontSize: '0.875rem',
+  fontWeight: '600',
+  color: 'var(--neutral-700)',
+};
+
+const botonesFiltroRedesignedStyle = {
+  display: 'flex',
+  gap: '0.5rem',
+  flexWrap: 'wrap',
+};
+
+const botonFiltroRedesignedStyle = (isActive) => ({
+  padding: '0.75rem 1.25rem',
+  borderRadius: '0.75rem',
+  border: '1px solid',
+  borderColor: isActive ? 'transparent' : 'var(--neutral-300)',
+  background: isActive ? 'var(--gradient-primary)' : 'white',
+  color: isActive ? 'white' : 'var(--neutral-700)',
+  cursor: 'pointer',
+  fontWeight: '600',
+  transition: 'all 0.2s ease',
+  boxShadow: isActive ? '0 4px 12px rgba(236, 72, 153, 0.3)' : 'none',
+});
+
+const inputFiltroRedesignedStyle = {
+  padding: '0.75rem 1rem',
+  borderRadius: '0.75rem',
+  border: '1px solid var(--neutral-300)',
+  background: 'white',
+  color: 'var(--neutral-700)',
+  fontSize: '0.875rem',
+  fontWeight: '500',
+};
+
+const estadisticasMetricsRedesignedStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+  gap: '2rem',
+};
+
+const estadisticaCardRedesignedStyle = {
+  background: 'white',
+  borderRadius: '1.5rem',
+  padding: '2rem',
+  boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+  border: '1px solid var(--neutral-200)',
+};
+
+const estadisticaCardTitleRedesignedStyle = {
+  fontSize: '1.25rem',
+  fontWeight: '700',
+  color: 'var(--neutral-800)',
+  marginBottom: '1.5rem',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.75rem',
+};
+
+const estadisticaCardContentRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+};
+
+const estadisticaItemRedesignedStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: '0.75rem 1rem',
+  background: 'var(--neutral-50)',
+  borderRadius: '0.75rem',
+  border: '1px solid var(--neutral-200)',
+};
+
+const estadisticaLabelRedesignedStyle = {
+  fontSize: '0.875rem',
+  color: 'var(--neutral-600)',
+  fontWeight: '500',
+};
+
+const estadisticaValueRedesignedStyle = {
+  fontSize: '1.125rem',
+  fontWeight: '700',
+  color: 'var(--neutral-800)',
+};
+
+const graficasContainerRedesignedStyle = {
+  display: 'grid',
+  gridTemplateColumns: '1fr',
+  gap: '2rem',
+  '@media (min-width: 1024px)': {
+    gridTemplateColumns: '1fr 1fr',
+  },
+};
+
+const graficaCardRedesignedStyle = {
+  background: 'white',
+  borderRadius: '1.5rem',
+  padding: '2rem',
+  boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+  border: '1px solid var(--neutral-200)',
+};
+
+const graficaTitleRedesignedStyle = {
+  fontSize: '1.25rem',
+  fontWeight: '700',
+  color: 'var(--neutral-800)',
+  marginBottom: '1.5rem',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.75rem',
+};
+
+const graficaContentRedesignedStyle = {
+  minHeight: '300px',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const chartContainerRedesignedStyle = {
+  display: 'flex',
+  alignItems: 'end',
+  gap: '1rem',
+  width: '100%',
+  height: '280px',
+  padding: '1rem 0',
+  overflowX: 'auto',
+};
+
+const chartBarGroupStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '0.5rem',
+  minWidth: '60px',
+  flexShrink: 0,
+};
+
+const chartBarsContainerStyle = {
+  display: 'flex',
+  alignItems: 'end',
+  gap: '8px',
+  height: '200px',
+};
+
+const chartBarRedesignedStyle = {
+  width: '20px',
+  borderRadius: '4px 4px 0 0',
+  minHeight: '2px',
+  transition: 'all 0.3s ease',
+};
+
+const chartLabelRedesignedStyle = {
+  fontSize: '0.75rem',
+  color: 'var(--neutral-600)',
+  textAlign: 'center',
+  fontWeight: '500',
+  transform: 'rotate(-15deg)',
+  whiteSpace: 'nowrap',
+};
+
+const topProductsChartRedesignedStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+  width: '100%',
+};
+
+const productChartItemRedesignedStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '1.5rem',
+  padding: '1rem',
+  background: 'var(--neutral-50)',
+  borderRadius: '1rem',
+  border: '1px solid var(--neutral-200)',
+};
+
+const productRankRedesignedStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '40px',
+  height: '40px',
+  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+  color: 'white',
+  borderRadius: '50%',
+  fontSize: '1rem',
+  fontWeight: '700',
+  flexShrink: 0,
+};
+
+const productInfoRedesignedStyle = {
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.5rem',
+};
+
+const productNameChartRedesignedStyle = {
+  fontSize: '1rem',
+  fontWeight: '600',
+  color: 'var(--neutral-800)',
+};
+
+const productBarContainerRedesignedStyle = {
+  height: '10px',
+  background: 'var(--neutral-200)',
+  borderRadius: '5px',
+  overflow: 'hidden',
+  width: '100%',
+};
+
+const productBarRedesignedStyle = {
+  height: '100%',
+  borderRadius: '5px',
+  transition: 'width 0.8s ease',
+};
+
+const productQuantityRedesignedStyle = {
+  fontSize: '1rem',
+  fontWeight: '700',
+  color: 'var(--primary-600)',
+  textAlign: 'right',
+  flexShrink: 0,
+};
+
+const historialCardStyle = {
+  background: 'white',
+  borderRadius: '12px',
+  padding: '1.5rem',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  border: '1px solid #e5e7eb'
+};
+
+const historialCardHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: '1rem',
+  paddingBottom: '1rem',
+  borderBottom: '1px solid #f3f4f6'
+};
+
+const historialCardIdStyle = {
+  fontFamily: 'monospace',
+  fontSize: '0.9rem',
+  fontWeight: '700',
+  color: '#6366f1'
+};
+
+const historialCardInfoStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  marginBottom: '1rem',
+  fontSize: '0.85rem',
+  color: '#6b7280'
+};
+
+const historialCardClientStyle = {
+  color: '#374151'
+};
+
+const historialCardDateStyle = {
+  color: '#6b7280'
+};
+
+const historialCardProductosStyle = {
+  marginBottom: '1rem'
+};
+
+const historialCardProductosTitleStyle = {
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  color: '#374151',
+  marginBottom: '0.5rem'
+};
+
+const historialCardProductoStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  padding: '0.75rem',
+  background: '#f9fafb',
+  borderRadius: '6px',
+  marginBottom: '0.5rem'
+};
+
+const historialCardProductoInfoStyle = {
+  flex: 1
+};
+
+const historialCardProductoNombreStyle = {
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  color: '#1f2937',
+  display: 'block',
+  marginBottom: '0.25rem'
+};
+
+const historialCardProductoCantidadStyle = {
+  fontSize: '0.8rem',
+  color: '#6b7280'
+};
+
+const historialCardProductoPrecioStyle = {
+  fontSize: '0.85rem',
+  fontWeight: '700',
+  color: '#059669'
+};
+
+const historialCardTotalesStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingTop: '1rem',
+  borderTop: '1px solid #f3f4f6'
+};
+
+const historialCardTotalStyle = {
+  fontSize: '1rem',
+  fontWeight: '700',
+  color: '#1f2937'
+};
+
+const historialCardGananciaStyle = {
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  color: '#22c55e'
+};
+
+const styleSheet = document.createElement("style");
+styleSheet.innerText = `
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideInDown { from { opacity:0; transform: translateY(-16px);} to { opacity:1; transform: translateY(0);} }
+  .fadeIn { animation: fadeIn 0.7s; }
+  
+  /* Estilos para historial responsive cards */
+  .historial-responsive-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  @media (max-width: 768px) {
+    /* Header fix para menú hamburguesa */
+    header {
+      display: block !important;
+    }
+    
+    header * {
+      max-width: none !important;
+    }
+    
+    header button {
+      display: flex !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+    
+    header button div {
+      display: block !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+
+    /* Admin Panel responsive */
+    .responsive-table { min-width: 520px; }
+    .responsive-card { padding: 1em 0.5em !important; }
+    .section-header { flex-direction: column !important; gap: 1em !important; align-items: stretch !important; }
+    .tabs-container { 
+      overflow-x: auto !important;
+      padding-bottom: 0.5rem !important;
+    }
+    .tab-button { 
+      min-width: max-content !important;
+      font-size: 0.85rem !important;
+      padding: 0.75rem 1rem !important;
+    }
+    
+    .admin-page-wrapper {
+      padding-top: 70px !important;
+      padding-left: 0.25rem !important;
+      padding-right: 0.25rem !important;
+    }
+    
+    /* Historial cards responsive */
+    .historial-card {
+      margin-bottom: 1rem !important;
+      padding: 1rem !important;
+    }
+    
+    .historial-card-header {
+      flex-direction: column !important;
+      gap: 0.5rem !important;
+      align-items: flex-start !important;
+    }
+    
+    .historial-card-info {
+      flex-direction: column !important;
+      gap: 0.5rem !important;
+    }
+    
+    .historial-card-producto {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 0.5rem !important;
+    }
+    
+    .historial-card-totales {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 0.5rem !important;
+      text-align: left !important;
+    }
+    
+    /* Stats container responsive */
+    .stats-container {
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 0.75rem !important;
+    }
+    
+    .stat-card {
+      padding: 0.75rem !important;
+      text-align: center !important;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .admin-page-wrapper {
+      padding-top: 60px !important;
+      padding-left: 0.125rem !important;
+      padding-right: 0.125rem !important;
+    }
+    
+    .tab-button {
+      font-size: 0.8rem !important;
+      padding: 0.6rem 0.8rem !important;
+    }
+    
+    .historial-card {
+      padding: 0.75rem !important;
+      margin-bottom: 0.75rem !important;
+    }
+    
+    .historial-card-header {
+      margin-bottom: 0.75rem !important;
+    }
+    
+    .historial-card-productos {
+      margin-bottom: 0.75rem !important;
+    }
+    
+    /* Stats en una sola columna para móviles pequeños */
+    .stats-container {
+      grid-template-columns: 1fr !important;
+      gap: 0.5rem !important;
+    }
+    
+    .stat-number {
+      font-size: 1.5rem !important;
+    }
+    
+    .stat-label {
+      font-size: 0.8rem !important;
+    }
+  }
+`;
+document.head.appendChild(styleSheet);
+
 export default AdminPanel;

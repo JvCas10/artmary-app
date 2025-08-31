@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const orderItemSchema = new mongoose.Schema({
   productId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Product', // Referencia al modelo de Producto
+    ref: 'Product',
     required: true
   },
   nombre: {
@@ -23,18 +23,27 @@ const orderItemSchema = new mongoose.Schema({
   },
   precioCompra: {
     type: Number,
-    required: true // NUEVO: Necesario para calcular ganancias
+    required: true
   },
   imagenUrl: {
     type: String
   },
   ganancia: {
     type: Number,
-    default: 0 // NUEVO: Ganancia por producto (precioVenta - precioCompra) * cantidad
-  }
-}, { _id: false }); // No crear un _id para cada subdocumento de item
-
-// Define el esquema principal del Pedido
+    default: 0
+  },
+  // NUEVOS CAMPOS OPCIONALES
+  cantidadOriginal: Number,
+  tipoVenta: {
+    type: String,
+    enum: ['individual', 'conjunto'],
+    default: 'individual'
+  },
+  nombreConjunto: String,
+  unidadesPorConjunto: Number,
+  precioConjunto: Number,
+  descripcionVenta: String
+}, { _id: false });
 const orderSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,

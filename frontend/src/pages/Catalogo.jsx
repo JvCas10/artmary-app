@@ -92,9 +92,72 @@ function Catalogo() {
     obtenerProductos(1, searchTerm, nuevosFiltros);
   };
 
-  const handleAgregar = (producto) => {
-    agregarAlCarrito(producto);
-    setMensaje(`"${producto.nombre}" agregado al carrito 🛒`);
+  // Función para calcular stock disponible considerando lo que ya está en el carrito
+  const calcularStockDisponible = (producto) => {
+    // Encontrar items del mismo producto en el carrito
+    const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+
+    const unidadesUsadasIndividual = itemsDelProducto
+      .filter(item => item.tipoVenta === 'individual')
+      .reduce((total, item) => total + item.cantidad, 0);
+
+    const conjuntosUsados = itemsDelProducto
+      .filter(item => item.tipoVenta === 'conjunto')
+      .reduce((total, item) => total + item.cantidad, 0);
+
+    // Calcular unidades totales ocupadas en el carrito
+    const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+
+    // Stock total disponible del producto
+    const stockTotalDisponible = producto.stock || 0;
+    const unidadesLibres = stockTotalDisponible - unidadesTotalesOcupadas;
+
+    // Conjuntos disponibles = cuántos conjuntos completos se pueden formar con las unidades libres
+    const conjuntosDisponibles = producto.tieneConjunto ?
+      Math.floor(unidadesLibres / (producto.unidadesPorConjunto || 1)) : 0;
+
+    return {
+      unidadesLibres,
+      conjuntosDisponibles
+    };
+  };
+
+  const handleAgregar = (producto, tipoVenta = 'individual', cantidad = 1) => {
+    // Calcular stock disponible
+    const stockDisponible = calcularStockDisponible(producto);
+
+    // Validar antes de agregar
+    if (tipoVenta === 'conjunto') {
+      if (stockDisponible.conjuntosDisponibles <= 0) {
+        setMensaje(`❌ No hay ${producto.nombreConjunto}s disponibles (stock ocupado por otros items)`);
+        setTimeout(() => setMensaje(''), 3000);
+        return;
+      }
+    } else {
+      if (stockDisponible.unidadesLibres <= 0) {
+        setMensaje(`❌ No hay unidades disponibles (stock ocupado por conjuntos en carrito)`);
+        setTimeout(() => setMensaje(''), 3000);
+        return;
+      }
+    }
+
+    const productoParaCarrito = {
+      ...producto,
+      tipoVenta,
+      cantidad,
+      precioUnitario: tipoVenta === 'conjunto' ? producto.precioUnidadEnConjunto : producto.precioVenta,
+      precioTotal: tipoVenta === 'conjunto' ?
+        (producto.precioConjunto * cantidad) :
+        (producto.precioVenta * cantidad)
+    };
+
+    agregarAlCarrito(productoParaCarrito);
+
+    const mensaje = tipoVenta === 'conjunto' ?
+      `✅ "${cantidad} ${producto.nombreConjunto}(s) de ${producto.nombre}" agregado al carrito` :
+      `✅ "${producto.nombre}" agregado al carrito`;
+
+    setMensaje(mensaje);
     setTimeout(() => setMensaje(''), 3000);
   };
 
@@ -221,6 +284,7 @@ function Catalogo() {
                 producto={producto}
                 onAgregar={handleAgregar}
                 index={index}
+                carrito={carrito}
               />
             ))}
           </div>
@@ -250,7 +314,7 @@ function Catalogo() {
 }
 
 // Componente ProductCard separado para mejor organización
-function ProductCard({ producto, onAgregar, index }) {
+function ProductCard({ producto, onAgregar, index, carrito }) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
@@ -324,28 +388,257 @@ function ProductCard({ producto, onAgregar, index }) {
         )}
 
         <div style={productDetailsStyle}>
-          <div style={priceContainerStyle}>
-            <span style={priceStyle}>Q{producto.precioVenta}</span>
-            <span style={stockTextStyle}>Stock: {producto.stock}</span>
+          {/* Precios duales */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+            <span style={priceStyle}>Q{producto.precioVenta} c/u</span>
+            {producto.tieneConjunto && (
+              <div style={{
+                padding: '8px 12px',
+                background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
+                border: '1px solid #a7f3d0',
+                borderRadius: '8px',
+                fontSize: '0.875rem'
+              }}>
+                <div style={{ fontWeight: '600', color: '#059669', marginBottom: '4px' }}>
+                  {producto.nombreConjunto}: Q{producto.precioConjunto}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#047857' }}>
+                  {producto.unidadesPorConjunto} unidades •
+                  Q{(producto.precioConjunto / producto.unidadesPorConjunto).toFixed(2)} c/u
+                  {((producto.precioVenta - (producto.precioConjunto / producto.unidadesPorConjunto)) / producto.precioVenta * 100).toFixed(1) > 0 && (
+                    <span style={{ fontWeight: '600', marginLeft: '8px' }}>
+                      ({((producto.precioVenta - (producto.precioConjunto / producto.unidadesPorConjunto)) / producto.precioVenta * 100).toFixed(1)}% desc.)
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          <button
-            onClick={() => onAgregar(producto)}
-            disabled={producto.stock === 0}
-            style={{
-              ...addToCartButtonStyle,
-              background: producto.stock === 0
-                ? 'var(--secondary-300)'
-                : 'var(--gradient-primary)',
-              cursor: producto.stock === 0 ? 'not-allowed' : 'pointer',
-              transform: isHovered && producto.stock > 0 ? 'translateY(-2px)' : 'translateY(0)'
-            }}
-          >
-            <span style={buttonIconStyle}>
-              {producto.stock === 0 ? '❌' : '🛒'}
+          {/* Stock dual */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={stockTextStyle}>
+              Stock: {(() => {
+                const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                const unidadesUsadasIndividual = itemsDelProducto
+                  .filter(item => item.tipoVenta === 'individual')
+                  .reduce((total, item) => total + item.cantidad, 0);
+                const conjuntosUsados = itemsDelProducto
+                  .filter(item => item.tipoVenta === 'conjunto')
+                  .reduce((total, item) => total + item.cantidad, 0);
+                const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                return unidadesLibres;
+              })()} unidades
             </span>
-            {producto.stock === 0 ? 'Agotado' : 'Agregar'}
-          </button>
+            {producto.tieneConjunto && (() => {
+              const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+              const unidadesUsadasIndividual = itemsDelProducto
+                .filter(item => item.tipoVenta === 'individual')
+                .reduce((total, item) => total + item.cantidad, 0);
+              const conjuntosUsados = itemsDelProducto
+                .filter(item => item.tipoVenta === 'conjunto')
+                .reduce((total, item) => total + item.cantidad, 0);
+              const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+              const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+              const cajasDisponibles = Math.floor(unidadesLibres / (producto.unidadesPorConjunto || 1));
+              return cajasDisponibles > 0;
+            })() && (
+                <span style={{ fontSize: '0.75rem', color: '#6b7280', fontStyle: 'italic' }}>
+                  + {(() => {
+                    const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                    const unidadesUsadasIndividual = itemsDelProducto
+                      .filter(item => item.tipoVenta === 'individual')
+                      .reduce((total, item) => total + item.cantidad, 0);
+                    const conjuntosUsados = itemsDelProducto
+                      .filter(item => item.tipoVenta === 'conjunto')
+                      .reduce((total, item) => total + item.cantidad, 0);
+                    const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                    const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                    return Math.floor(unidadesLibres / (producto.unidadesPorConjunto || 1));
+                  })()} {producto.nombreConjunto?.toLowerCase() || 'conjunto'}(s)
+                </span>
+              )}
+          </div>
+          {/* Botones duales de agregar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* Botón para compra individual */}
+            <button
+              onClick={() => onAgregar(producto, 'individual', 1)}
+              disabled={(() => {
+                // Calcular stock disponible dinámicamente
+                const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                const unidadesUsadasIndividual = itemsDelProducto
+                  .filter(item => item.tipoVenta === 'individual')
+                  .reduce((total, item) => total + item.cantidad, 0);
+                const conjuntosUsados = itemsDelProducto
+                  .filter(item => item.tipoVenta === 'conjunto')
+                  .reduce((total, item) => total + item.cantidad, 0);
+                const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                return unidadesLibres <= 0;
+              })()}
+              style={{
+                ...addToCartButtonStyle,
+                background: (() => {
+                  const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                  const unidadesUsadasIndividual = itemsDelProducto
+                    .filter(item => item.tipoVenta === 'individual')
+                    .reduce((total, item) => total + item.cantidad, 0);
+                  const conjuntosUsados = itemsDelProducto
+                    .filter(item => item.tipoVenta === 'conjunto')
+                    .reduce((total, item) => total + item.cantidad, 0);
+                  const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                  const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                  return unidadesLibres <= 0 ? 'var(--secondary-300)' : 'var(--gradient-primary)';
+                })(),
+                cursor: (() => {
+                  const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                  const unidadesUsadasIndividual = itemsDelProducto
+                    .filter(item => item.tipoVenta === 'individual')
+                    .reduce((total, item) => total + item.cantidad, 0);
+                  const conjuntosUsados = itemsDelProducto
+                    .filter(item => item.tipoVenta === 'conjunto')
+                    .reduce((total, item) => total + item.cantidad, 0);
+                  const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                  const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                  return unidadesLibres <= 0 ? 'not-allowed' : 'pointer';
+                })(),
+                transform: isHovered && (() => {
+                  const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                  const unidadesUsadasIndividual = itemsDelProducto
+                    .filter(item => item.tipoVenta === 'individual')
+                    .reduce((total, item) => total + item.cantidad, 0);
+                  const conjuntosUsados = itemsDelProducto
+                    .filter(item => item.tipoVenta === 'conjunto')
+                    .reduce((total, item) => total + item.cantidad, 0);
+                  const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                  const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                  return unidadesLibres > 0;
+                })() ? 'translateY(-2px)' : 'translateY(0)',
+                marginBottom: '0'
+              }}
+            >
+              <span style={buttonIconStyle}>
+                {(() => {
+                  const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                  const unidadesUsadasIndividual = itemsDelProducto
+                    .filter(item => item.tipoVenta === 'individual')
+                    .reduce((total, item) => total + item.cantidad, 0);
+                  const conjuntosUsados = itemsDelProducto
+                    .filter(item => item.tipoVenta === 'conjunto')
+                    .reduce((total, item) => total + item.cantidad, 0);
+                  const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                  const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                  return unidadesLibres <= 0 ? '❌' : '🛒';
+                })()}
+              </span>
+              {(() => {
+                const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                const unidadesUsadasIndividual = itemsDelProducto
+                  .filter(item => item.tipoVenta === 'individual')
+                  .reduce((total, item) => total + item.cantidad, 0);
+                const conjuntosUsados = itemsDelProducto
+                  .filter(item => item.tipoVenta === 'conjunto')
+                  .reduce((total, item) => total + item.cantidad, 0);
+                const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                return unidadesLibres <= 0 ? 'Sin Stock' : 'Agregar Unidad';
+              })()}
+            </button>
+
+            {/* Botón para compra por conjunto (solo si aplica) */}
+            {producto.tieneConjunto && (
+              <button
+                onClick={() => onAgregar(producto, 'conjunto', 1)}
+                disabled={(() => {
+                  const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                  const unidadesUsadasIndividual = itemsDelProducto
+                    .filter(item => item.tipoVenta === 'individual')
+                    .reduce((total, item) => total + item.cantidad, 0);
+                  const conjuntosUsados = itemsDelProducto
+                    .filter(item => item.tipoVenta === 'conjunto')
+                    .reduce((total, item) => total + item.cantidad, 0);
+                  const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                  const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                  const conjuntosDisponibles = Math.floor(unidadesLibres / (producto.unidadesPorConjunto || 1));
+                  return conjuntosDisponibles <= 0;
+                })()}
+                style={{
+                  ...addToCartButtonStyle,
+                  background: (() => {
+                    const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                    const unidadesUsadasIndividual = itemsDelProducto
+                      .filter(item => item.tipoVenta === 'individual')
+                      .reduce((total, item) => total + item.cantidad, 0);
+                    const conjuntosUsados = itemsDelProducto
+                      .filter(item => item.tipoVenta === 'conjunto')
+                      .reduce((total, item) => total + item.cantidad, 0);
+                    const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                    const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                    const conjuntosDisponibles = Math.floor(unidadesLibres / (producto.unidadesPorConjunto || 1));
+                    return conjuntosDisponibles <= 0 ? '#9ca3af' : 'linear-gradient(135deg, #059669, #047857)';
+                  })(),
+                  cursor: (() => {
+                    const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                    const unidadesUsadasIndividual = itemsDelProducto
+                      .filter(item => item.tipoVenta === 'individual')
+                      .reduce((total, item) => total + item.cantidad, 0);
+                    const conjuntosUsados = itemsDelProducto
+                      .filter(item => item.tipoVenta === 'conjunto')
+                      .reduce((total, item) => total + item.cantidad, 0);
+                    const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                    const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                    const conjuntosDisponibles = Math.floor(unidadesLibres / (producto.unidadesPorConjunto || 1));
+                    return conjuntosDisponibles <= 0 ? 'not-allowed' : 'pointer';
+                  })(),
+                  transform: isHovered && (() => {
+                    const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                    const unidadesUsadasIndividual = itemsDelProducto
+                      .filter(item => item.tipoVenta === 'individual')
+                      .reduce((total, item) => total + item.cantidad, 0);
+                    const conjuntosUsados = itemsDelProducto
+                      .filter(item => item.tipoVenta === 'conjunto')
+                      .reduce((total, item) => total + item.cantidad, 0);
+                    const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                    const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                    const conjuntosDisponibles = Math.floor(unidadesLibres / (producto.unidadesPorConjunto || 1));
+                    return conjuntosDisponibles - conjuntosUsados > 0 ? '0 4px 12px rgba(5, 150, 105, 0.3)' : 'none';
+                  })() ? 'translateY(-2px)' : 'translateY(0)',
+                  boxShadow: (() => {
+                    const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                    const unidadesUsadasIndividual = itemsDelProducto
+                      .filter(item => item.tipoVenta === 'individual')
+                      .reduce((total, item) => total + item.cantidad, 0);
+                    const conjuntosUsados = itemsDelProducto
+                      .filter(item => item.tipoVenta === 'conjunto')
+                      .reduce((total, item) => total + item.cantidad, 0);
+                    const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                    const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                    const conjuntosDisponibles = Math.floor(unidadesLibres / (producto.unidadesPorConjunto || 1));
+                    return conjuntosDisponibles - conjuntosUsados > 0 ? '0 4px 12px rgba(5, 150, 105, 0.3)' : 'none';
+                  })()
+                }}
+              >
+                <span style={buttonIconStyle}>📦</span>
+                {(() => {
+                  const itemsDelProducto = carrito.filter(item => item._id === producto._id);
+                  const unidadesUsadasIndividual = itemsDelProducto
+                    .filter(item => item.tipoVenta === 'individual')
+                    .reduce((total, item) => total + item.cantidad, 0);
+                  const conjuntosUsados = itemsDelProducto
+                    .filter(item => item.tipoVenta === 'conjunto')
+                    .reduce((total, item) => total + item.cantidad, 0);
+                  const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+                  const unidadesLibres = (producto.stock || 0) - unidadesTotalesOcupadas;
+                  const conjuntosDisponibles = Math.floor(unidadesLibres / (producto.unidadesPorConjunto || 1));
+                  return conjuntosDisponibles <= 0 ?
+                    `Sin ${producto.nombreConjunto}s` :
+                    `Agregar ${producto.nombreConjunto}`;
+                })()}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </article>
@@ -356,7 +649,8 @@ function ProductCard({ producto, onAgregar, index }) {
 const containerStyle = {
   minHeight: '100vh',
   fontFamily: 'var(--font-sans)',
-  paddingBottom: '2rem'
+  paddingBottom: '2rem',
+  paddingTop: '100px' // ← AGREGA ESTA LÍNEA
 };
 
 const loadingContainerStyle = {
@@ -398,8 +692,8 @@ const loadingSubtextStyle = {
 };
 
 const heroSectionStyle = {
-  background: 'var(--gradient-primary)',
-  color: 'white',
+  background: 'linear-gradient(135deg, #fdf2f8 0%, #fef3c7 25%, #fce7f3 50%, #e0e7ff 75%, #f3f4f6 100%)', // ← CAMBIA ESTA LÍNEA
+  color: '#374151', // ← CAMBIA DE white a color oscuro
   padding: '4rem 2rem',
   textAlign: 'center',
   position: 'relative',
@@ -423,7 +717,7 @@ const heroTitleStyle = {
   marginBottom: '1rem',
   lineHeight: 1.1,
   fontFamily: 'var(--font-display)',
-  color: 'white'
+  color: '#1f2937' // ← CAMBIA DE white a color oscuro
 };
 
 const heroTitleAccentStyle = {

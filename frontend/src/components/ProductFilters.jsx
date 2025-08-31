@@ -1,11 +1,11 @@
 // src/components/ProductFilters.jsx - DISEÑO MODERNO PREMIUM
 import React, { useState, useEffect } from 'react';
 
-function ProductFilters({ 
-    onFiltersChange, 
-    categorias = [], 
+function ProductFilters({
+    onFiltersChange,
+    categorias = [],
     filtrosAplicados = {},
-    totalProductos = 0 
+    totalProductos = 0
 }) {
     const [localFilters, setLocalFilters] = useState({
         categoria: filtrosAplicados.categoria || '',
@@ -15,7 +15,7 @@ function ProductFilters({
         sortBy: filtrosAplicados.sortBy || 'default'
     });
 
-    const [appliedFilters, setAppliedFilters] = useState({...localFilters});
+    const [appliedFilters, setAppliedFilters] = useState({ ...localFilters });
     const [isOpen, setIsOpen] = useState(false);
 
     // Rangos de precio predefinidos
@@ -61,16 +61,16 @@ function ProductFilters({
     };
 
     const handleRangoPrecio = (min, max) => {
-        setLocalFilters(prev => ({ 
-            ...prev, 
-            precioMin: min, 
-            precioMax: max === null ? '' : max 
+        setLocalFilters(prev => ({
+            ...prev,
+            precioMin: min,
+            precioMax: max === null ? '' : max
         }));
     };
 
     // Aplicar todos los filtros excepto ordenamiento
     const aplicarFiltros = () => {
-        setAppliedFilters({...localFilters});
+        setAppliedFilters({ ...localFilters });
         onFiltersChange(localFilters);
         setIsOpen(false);
     };
@@ -102,8 +102,8 @@ function ProductFilters({
     };
 
     const isRangeActive = (min, max) => {
-        return localFilters.precioMin == min && 
-               (max === null ? localFilters.precioMax === '' : localFilters.precioMax == max);
+        return localFilters.precioMin == min &&
+            (max === null ? localFilters.precioMax === '' : localFilters.precioMax == max);
     };
 
     const getDisponibilidadIcon = (value) => {
@@ -135,8 +135,8 @@ function ProductFilters({
                     onClick={() => setIsOpen(!isOpen)}
                     style={{
                         ...toggleButtonStyle,
-                        background: contarFiltrosActivos() > 0 
-                            ? 'var(--gradient-secondary)' 
+                        background: contarFiltrosActivos() > 0
+                            ? 'var(--gradient-secondary)'
                             : 'var(--gradient-primary)'
                     }}
                 >
@@ -154,8 +154,8 @@ function ProductFilters({
                 </button>
 
                 {contarFiltrosActivos() > 0 && (
-                    <button 
-                        onClick={limpiarFiltros} 
+                    <button
+                        onClick={limpiarFiltros}
                         style={clearButtonStyle}
                     >
                         <span style={clearIconStyle}>🗑️</span>
@@ -167,7 +167,8 @@ function ProductFilters({
             {/* Panel de filtros con animación */}
             <div style={{
                 ...panelContainerStyle,
-                maxHeight: isOpen ? '1000px' : '0',
+                maxHeight: isOpen ? 'none' : '0', // ← CAMBIA 'none' en lugar de '1000px'
+                height: isOpen ? 'auto' : '0', // ← AGREGA esta línea
                 opacity: isOpen ? 1 : 0,
                 visibility: isOpen ? 'visible' : 'hidden'
             }}>
@@ -176,7 +177,7 @@ function ProductFilters({
                     <div style={infoCardStyle}>
                         <div style={infoIconStyle}>💡</div>
                         <div style={infoTextStyle}>
-                            <strong>Tip:</strong> Ajusta múltiples filtros y presiona "Aplicar" para ver resultados. 
+                            <strong>Tip:</strong> Ajusta múltiples filtros y presiona "Aplicar" para ver resultados.
                             El ordenamiento se aplica al instante.
                         </div>
                     </div>
@@ -222,7 +223,7 @@ function ProductFilters({
                         </div>
 
                         {/* Filtro por Ordenamiento - SE APLICA INMEDIATAMENTE */}
-                        <div style={{...filterCardStyle, ...immediateFilterStyle}}>
+                        <div style={{ ...filterCardStyle, ...immediateFilterStyle }}>
                             <label style={filterLabelStyle}>
                                 <span style={filterIconStyle}>🔄</span>
                                 Ordenar por
@@ -231,7 +232,7 @@ function ProductFilters({
                             <select
                                 value={localFilters.sortBy}
                                 onChange={(e) => handleSortChange(e.target.value)}
-                                style={{...selectStyle, borderColor: 'var(--accent-green)'}}
+                                style={{ ...selectStyle, borderColor: 'var(--accent-green)' }}
                             >
                                 <option value="default">🆕 Más recientes</option>
                                 <option value="price_asc">💰⬆️ Precio: Menor a mayor</option>
@@ -250,7 +251,7 @@ function ProductFilters({
                             <span style={sectionIconStyle}>💰</span>
                             Rango de Precio
                         </h4>
-                        
+
                         {/* Inputs de precio personalizado */}
                         <div style={priceInputsContainerStyle}>
                             <div style={priceInputGroupStyle}>
@@ -265,9 +266,9 @@ function ProductFilters({
                                     step="0.01"
                                 />
                             </div>
-                            
+
                             <div style={priceSeparatorStyle}>—</div>
-                            
+
                             <div style={priceInputGroupStyle}>
                                 <label style={priceInputLabelStyle}>Máximo</label>
                                 <input
@@ -339,10 +340,10 @@ function ProductFilters({
                                     <div style={activeFilterTagStyle}>
                                         <span style={tagIconStyle}>🏷️</span>
                                         <span>Categoría: {appliedFilters.categoria}</span>
-                                        <button 
+                                        <button
                                             onClick={() => {
                                                 handleFilterChange('categoria', '');
-                                                const newFilters = {...localFilters, categoria: ''};
+                                                const newFilters = { ...localFilters, categoria: '' };
                                                 setAppliedFilters(newFilters);
                                                 onFiltersChange(newFilters);
                                             }}
@@ -360,10 +361,10 @@ function ProductFilters({
                                             {appliedFilters.disponibilidad === 'stock_bajo' && 'Stock bajo'}
                                             {appliedFilters.disponibilidad === 'agotado' && 'Agotados'}
                                         </span>
-                                        <button 
+                                        <button
                                             onClick={() => {
                                                 handleFilterChange('disponibilidad', '');
-                                                const newFilters = {...localFilters, disponibilidad: ''};
+                                                const newFilters = { ...localFilters, disponibilidad: '' };
                                                 setAppliedFilters(newFilters);
                                                 onFiltersChange(newFilters);
                                             }}
@@ -377,11 +378,11 @@ function ProductFilters({
                                         <span>
                                             Q{appliedFilters.precioMin || '0'} - Q{appliedFilters.precioMax || '∞'}
                                         </span>
-                                        <button 
+                                        <button
                                             onClick={() => {
                                                 handleFilterChange('precioMin', '');
                                                 handleFilterChange('precioMax', '');
-                                                const newFilters = {...localFilters, precioMin: '', precioMax: ''};
+                                                const newFilters = { ...localFilters, precioMin: '', precioMax: '' };
                                                 setAppliedFilters(newFilters);
                                                 onFiltersChange(newFilters);
                                             }}
@@ -395,7 +396,7 @@ function ProductFilters({
                                             {getSortIcon(appliedFilters.sortBy)}
                                         </span>
                                         <span>Ordenado</span>
-                                        <button 
+                                        <button
                                             onClick={() => handleSortChange('default')}
                                             style={removeTagButtonStyle}
                                         >×</button>
@@ -419,11 +420,11 @@ const containerStyle = {
 };
 
 const headerStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '1rem',
-  flexWrap: 'wrap'
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '1rem',
+    flexWrap: 'wrap'
 };
 
 const toggleButtonStyle = {
@@ -514,17 +515,21 @@ const clearIconStyle = {
 };
 
 const panelContainerStyle = {
-    overflow: 'hidden',
-    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+    overflow: 'visible', // ← CAMBIA de 'hidden' a 'visible'
+    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+    background: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(10px)',
+    borderRadius: '0 0 var(--border-radius-2xl) var(--border-radius-2xl)',
+    border: '1px solid var(--secondary-200)',
+    borderTop: 'none',
+    // ← QUITA cualquier maxHeight que esté aquí
+    zIndex: 1000 // ← AGREGA esto para que aparezca encima
 };
 
 const panelStyle = {
-    marginTop: '1.5rem',
-    padding: '2rem',
-    background: 'white',
-    borderRadius: 'var(--border-radius-2xl)',
-    boxShadow: 'var(--shadow-xl)',
-    border: '1px solid var(--secondary-200)'
+    padding: '1.5rem', // ← Reduce el padding
+    minHeight: 'auto', // ← AGREGA esto
+    height: 'auto' // ← AGREGA esto
 };
 
 const infoCardStyle = {
@@ -848,6 +853,7 @@ const removeTagButtonStyle = {
 };
 
 // Media queries para responsive
+// Media queries para responsive
 const mediaQueries = `
 @media (max-width: 768px) {
     .filters-header {
@@ -857,41 +863,27 @@ const mediaQueries = `
     }
     
     .filters-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .price-inputs-container {
-        flex-direction: column;
-        align-items: stretch;
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
     }
     
     .range-buttons-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 0.5rem !important;
     }
     
     .action-buttons {
         flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .stats-container {
-        justify-content: space-around;
+        gap: 0.75rem !important;
     }
 }
 
-@media (max-width: 480px) {
-    .toggle-button {
-        min-width: auto;
-        flex: 1;
-    }
-    
-    .stats-container {
-        gap: 1rem;
-    }
-    
-    .clear-button {
-        padding: 0.5rem;
-        font-size: 0.75rem;
+/* Forzar altura automática en móvil */
+@media (max-width: 768px) {
+    .panel-container {
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
     }
 }
 `;

@@ -1,13 +1,13 @@
-// src/components/admin/PuntoDeVenta.jsx - INTERFAZ PUNTO DE VENTA CORREGIDA
+// src/components/admin/PuntoDeVenta.jsx - INTERFAZ PUNTO DE VENTA CON LÓGICA DE CAJAS Y UNIDADES
 import React, { useState, useEffect } from 'react';
-import './PuntoDeVenta.css'; // Importamos los estilos por separado
+import './PuntoDeVenta.css';
 
-function PuntoDeVenta({ 
-  productos, 
-  carritoPos, 
-  setCarritoPos, 
-  onVentaRegistrada, 
-  obtenerTodosLosProductos 
+function PuntoDeVenta({
+  productos,
+  carritoPos,
+  setCarritoPos,
+  onVentaRegistrada,
+  obtenerTodosLosProductos
 }) {
   const [busqueda, setBusqueda] = useState('');
   const [todosLosProductos, setTodosLosProductos] = useState([]);
@@ -16,6 +16,7 @@ function PuntoDeVenta({
   const [isLoading, setIsLoading] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [cliente, setCliente] = useState({ nombre: '', telefono: '' });
+  const [metodoPago, setMetodoPago] = useState('efectivo');
 
   // Cargar todos los productos al inicializar
   useEffect(() => {
@@ -61,61 +62,127 @@ function PuntoDeVenta({
     return isNaN(numPrice) ? '0.00' : numPrice.toFixed(2);
   };
 
-  const agregarAlCarrito = (producto) => {
-    if (producto.stock <= 0) {
-      setMensaje('⚠️ Este producto no tiene stock disponible');
-      setTimeout(() => setMensaje(''), 3000);
-      return;
-    }
+  // Función para calcular stock disponible considerando lo que ya está en el carrito
+  const calcularStockDisponible = (producto) => {
+    // Encontrar items del mismo producto en el carrito
+    const itemsDelProducto = carritoPos.filter(item => item._id === producto._id);
 
-    const existeEnCarrito = carritoPos.find(item => item._id === producto._id);
-    
-    if (existeEnCarrito) {
-      if (existeEnCarrito.cantidad >= producto.stock) {
-        setMensaje('⚠️ No hay más stock disponible de este producto');
+    const unidadesUsadasIndividual = itemsDelProducto
+      .filter(item => item.tipoVenta === 'individual')
+      .reduce((total, item) => total + item.cantidad, 0);
+
+    const conjuntosUsados = itemsDelProducto
+      .filter(item => item.tipoVenta === 'conjunto')
+      .reduce((total, item) => total + item.cantidad, 0);
+
+    // Calcular unidades totales ocupadas en el carrito
+    const unidadesTotalesOcupadas = unidadesUsadasIndividual + (conjuntosUsados * (producto.unidadesPorConjunto || 0));
+
+    // Stock total disponible del producto
+    const stockTotalDisponible = producto.stock || 0;
+    const unidadesLibres = stockTotalDisponible - unidadesTotalesOcupadas;
+
+    // Conjuntos disponibles = cuántos conjuntos completos se pueden formar con las unidades libres
+    const conjuntosDisponibles = producto.tieneConjunto ?
+      Math.floor(unidadesLibres / (producto.unidadesPorConjunto || 1)) : 0;
+
+    return {
+      unidadesLibres,
+      conjuntosDisponibles
+    };
+  };
+
+  const agregarAlCarrito = (producto, tipoVenta = 'individual', cantidad = 1) => {
+    // Calcular stock disponible
+    const stockDisponible = calcularStockDisponible(producto);
+
+    // Validar antes de agregar
+    if (tipoVenta === 'conjunto') {
+      if (stockDisponible.conjuntosDisponibles <= 0) {
+        setMensaje(`❌ No hay ${producto.nombreConjunto}s disponibles (stock ocupado por otros items)`);
         setTimeout(() => setMensaje(''), 3000);
         return;
       }
-      
-      setCarritoPos(prev => 
-        prev.map(item => 
-          item._id === producto._id 
-            ? { ...item, cantidad: item.cantidad + 1 }
+    } else {
+      if (stockDisponible.unidadesLibres <= 0) {
+        setMensaje(`❌ No hay unidades disponibles (stock ocupado por conjuntos en carrito)`);
+        setTimeout(() => setMensaje(''), 3000);
+        return;
+      }
+    }
+
+    // Buscar item existente del mismo tipo
+    const existeEnCarrito = carritoPos.find(item =>
+      item._id === producto._id && item.tipoVenta === tipoVenta
+    );
+
+    if (existeEnCarrito) {
+      setCarritoPos(prev =>
+        prev.map(item =>
+          item._id === producto._id && item.tipoVenta === tipoVenta
+            ? { ...item, cantidad: item.cantidad + cantidad }
             : item
         )
       );
     } else {
-      setCarritoPos(prev => [...prev, { ...producto, cantidad: 1 }]);
+      const nuevoItem = {
+        ...producto,
+        tipoVenta,
+        cantidad,
+        claveUnica: `${producto._id}-${tipoVenta}`,
+        precioDisplay: tipoVenta === 'conjunto' ? producto.precioConjunto : producto.precioVenta
+      };
+      setCarritoPos(prev => [...prev, nuevoItem]);
     }
 
-    setMensaje('✅ Producto agregado al carrito');
+    const mensaje = tipoVenta === 'conjunto' ?
+      `✅ ${producto.nombreConjunto} agregado al carrito` :
+      `✅ ${producto.nombre} agregado al carrito`;
+    setMensaje(mensaje);
     setTimeout(() => setMensaje(''), 2000);
   };
 
-  const actualizarCantidad = (productoId, nuevaCantidad) => {
+  const actualizarCantidad = (productoId, nuevaCantidad, tipoVenta = 'individual') => {
     if (nuevaCantidad <= 0) {
-      eliminarDelCarrito(productoId);
+      eliminarDelCarrito(productoId, tipoVenta);
       return;
     }
 
     const producto = todosLosProductos.find(p => p._id === productoId);
-    if (nuevaCantidad > producto.stock) {
-      setMensaje('⚠️ Cantidad excede el stock disponible');
-      setTimeout(() => setMensaje(''), 3000);
-      return;
+    if (!producto) return;
+
+    // Validar stock disponible considerando el carrito actual
+    const stockDisponible = calcularStockDisponible(producto);
+
+    if (tipoVenta === 'conjunto') {
+      if (nuevaCantidad > stockDisponible.conjuntosDisponibles + (carritoPos.find(item =>
+        item._id === productoId && item.tipoVenta === tipoVenta)?.cantidad || 0)) {
+        setMensaje('⚠️ Cantidad excede el stock disponible');
+        setTimeout(() => setMensaje(''), 3000);
+        return;
+      }
+    } else {
+      if (nuevaCantidad > stockDisponible.unidadesLibres + (carritoPos.find(item =>
+        item._id === productoId && item.tipoVenta === tipoVenta)?.cantidad || 0)) {
+        setMensaje('⚠️ Cantidad excede el stock disponible');
+        setTimeout(() => setMensaje(''), 3000);
+        return;
+      }
     }
 
     setCarritoPos(prev =>
       prev.map(item =>
-        item._id === productoId
+        item._id === productoId && item.tipoVenta === tipoVenta
           ? { ...item, cantidad: nuevaCantidad }
           : item
       )
     );
   };
 
-  const eliminarDelCarrito = (productoId) => {
-    setCarritoPos(prev => prev.filter(item => item._id !== productoId));
+  const eliminarDelCarrito = (productoId, tipoVenta = 'individual') => {
+    setCarritoPos(prev => prev.filter(item =>
+      !(item._id === productoId && item.tipoVenta === tipoVenta)
+    ));
   };
 
   const vaciarCarrito = () => {
@@ -124,15 +191,23 @@ function PuntoDeVenta({
   };
 
   const calcularTotal = () => {
-    return carritoPos.reduce((total, item) => 
-      total + (item.precioVenta * item.cantidad), 0
-    );
+    return carritoPos.reduce((total, item) => {
+      const precio = item.tipoVenta === 'conjunto' ? item.precioConjunto : item.precioVenta;
+      return total + (precio * item.cantidad);
+    }, 0);
   };
 
   const calcularGanancias = () => {
-    return carritoPos.reduce((total, item) => 
-      total + ((item.precioVenta - item.precioCompra) * item.cantidad), 0
-    );
+    return carritoPos.reduce((total, item) => {
+      const precioVentaUnitario = item.tipoVenta === 'conjunto' ?
+        (item.precioConjunto / item.unidadesPorConjunto) :
+        item.precioVenta;
+      const unidadesVendidas = item.tipoVenta === 'conjunto' ?
+        (item.cantidad * item.unidadesPorConjunto) :
+        item.cantidad;
+      const gananciaUnitaria = precioVentaUnitario - item.precioCompra;
+      return total + (gananciaUnitaria * unidadesVendidas);
+    }, 0);
   };
 
   const procesarVenta = async () => {
@@ -152,21 +227,44 @@ function PuntoDeVenta({
     try {
       const ventaData = {
         cliente: cliente,
-        productos: carritoPos.map(item => ({
-          productoId: item._id,
-          nombre: item.nombre,
-          cantidad: item.cantidad,
-          precioVenta: item.precioVenta,
-          precioCompra: item.precioCompra,
-          subtotal: item.precioVenta * item.cantidad,
-          ganancia: (item.precioVenta - item.precioCompra) * item.cantidad
-        })),
+        productos: carritoPos.map(item => {
+          // Detectar si es conjunto
+          const esConjunto = item.tipoVenta === 'conjunto';
+
+          return {
+            productoId: item._id,
+            nombre: item.nombre,
+            // Para conjuntos: unidades totales, para individuales: cantidad normal
+            cantidad: esConjunto ? (item.cantidad * item.unidadesPorConjunto) : item.cantidad,
+            tipoVenta: item.tipoVenta || 'individual',
+            cantidadOriginal: item.cantidad, // Cantidad original de conjuntos o unidades
+            precioVenta: esConjunto ? item.precioConjunto : item.precioVenta,
+            precioCompra: item.precioCompra,
+            subtotal: (esConjunto ? item.precioConjunto : item.precioVenta) * item.cantidad,
+            ganancia: esConjunto ?
+              ((item.precioConjunto / item.unidadesPorConjunto) - item.precioCompra) * (item.cantidad * item.unidadesPorConjunto) :
+              (item.precioVenta - item.precioCompra) * item.cantidad,
+            // Campos adicionales para conjuntos
+            ...(esConjunto && {
+              unidadesPorConjunto: item.unidadesPorConjunto,
+              nombreConjunto: item.nombreConjunto,
+              precioConjunto: item.precioConjunto,
+              descripcionVenta: `${item.cantidad} ${item.nombreConjunto}(s) = ${item.cantidad * item.unidadesPorConjunto} unidades`
+            }),
+            // Campos para individuales
+            ...(!esConjunto && {
+              descripcionVenta: `${item.cantidad} unidades individuales`
+            })
+          };
+        }),
         total: calcularTotal(),
         gananciaTotal: calcularGanancias(),
         tipo: 'fisica',
-        metodoPago: 'efectivo',
+        metodoPago: metodoPago,
         fecha: new Date()
       };
+
+      console.log('💾 Enviando datos de venta física:', ventaData);
 
       await onVentaRegistrada(ventaData);
       vaciarCarrito();
@@ -185,108 +283,166 @@ function PuntoDeVenta({
     <div className="pos-container">
       {/* Mensajes */}
       {mensaje && (
-        <div className={`notification ${mensaje.includes('✅') ? 'success' : 'error'}`}>
+        <div className={`notification ${mensaje.includes('✅') ? 'success' : mensaje.includes('❌') ? 'error' : 'warning'}`}>
+          <span className="notification-icon">
+            {mensaje.includes('✅') ? '✅' : mensaje.includes('❌') ? '❌' : '⚠️'}
+          </span>
           {mensaje}
         </div>
       )}
 
+      {/* Contenido principal */}
       <div className="pos-layout">
-        {/* Panel izquierdo - Catálogo de productos */}
-        <div className="catalogo-panel">
-          <div className="catalogo-header">
+        {/* Panel izquierdo - Productos */}
+        <div className="productos-panel">
+          <div className="productos-header">
             <h2 className="panel-title">
               <span className="panel-icon">🛍️</span>
               Catálogo de Productos
             </h2>
-            
-            {/* Búsqueda */}
-            <div className="search-container">
-              <input
-                type="text"
-                placeholder="Buscar productos..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className="search-input"
-              />
-              <span className="search-icon">🔍</span>
-            </div>
 
-            {/* Filtro por categoría */}
-            <select
-              value={categoriaSeleccionada}
-              onChange={(e) => setCategoriaSeleccionada(e.target.value)}
-              className="category-select"
-            >
-              <option value="todas">Todas las categorías</option>
-              {categorias.map(categoria => (
-                <option key={categoria} value={categoria}>
-                  {categoria}
-                </option>
-              ))}
-            </select>
+            {/* Controles de búsqueda y filtrado */}
+            <div className="productos-controls">
+              <div className="search-container">
+                <input
+                  type="text"
+                  placeholder="Buscar productos..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  className="search-input"
+                />
+                <span className="search-icon">🔍</span>
+              </div>
+
+              <select
+                value={categoriaSeleccionada}
+                onChange={(e) => setCategoriaSeleccionada(e.target.value)}
+                className="category-select"
+              >
+                <option value="todas">Todas las categorías</option>
+                {categorias.map(categoria => (
+                  <option key={categoria} value={categoria}>{categoria}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Grid de productos */}
           <div className="productos-grid">
-            {productosFiltrados.length === 0 ? (
-              <div className="no-products">
-                <span className="no-products-icon">📦</span>
-                <p className="no-products-text">
-                  {busqueda || categoriaSeleccionada !== 'todas' 
-                    ? 'No se encontraron productos con esos filtros'
-                    : 'No hay productos disponibles'
-                  }
-                </p>
-              </div>
-            ) : (
-              productosFiltrados.map(producto => (
-                <div key={producto._id} className="producto-card">
-                  <div className="producto-image-container">
-                    <img
-                      src={producto.imagenUrl || "https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?w=120&h=120&fit=crop"}
-                      alt={producto.nombre}
-                      className="producto-image"
-                      onError={(e) => {
-                        e.target.src = "https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?w=120&h=120&fit=crop";
-                      }}
-                    />
-                    <div className={`stock-badge ${producto.stock === 0 ? 'sin-stock' : 'con-stock'}`}>
-                      Stock: {producto.stock}
+            {productosFiltrados.map(producto => (
+              <div key={producto._id} className="producto-card">
+                <div className="producto-imagen">
+                  {producto.imagenUrl ? (
+                    <img src={producto.imagenUrl} alt={producto.nombre} className="producto-img" />
+                  ) : (
+                    <div className="placeholder-image">
+                      <span className="placeholder-icon">📦</span>
                     </div>
-                  </div>
-                  
-                  <div className="producto-info">
-                    <h4 className="producto-nombre">{producto.nombre}</h4>
-                    <p className="producto-categoria">{producto.categoria || 'Sin categoría'}</p>
-                    <p className="producto-precio">Q{formatPrice(producto.precioVenta)}</p>
+                  )}
+                </div>
+                <div className="producto-info">
+                  <h3 className="producto-nombre">{producto.nombre}</h3>
+                  <p className="producto-categoria">{producto.categoria}</p>
+
+                  {/* Información de precios */}
+                  <div className="producto-precios">
+                    <div className="precio-individual">
+                      <span className="precio-label">Individual:</span>
+                      <span className="precio-valor">Q{formatPrice(producto.precioVenta)}</span>
+                    </div>
+
+                    {/* Mostrar información de conjunto si aplica */}
+                    {producto.tieneConjunto && (
+                      <div className="precio-conjunto">
+                        <span className="precio-label">{producto.nombreConjunto}:</span>
+                        <span className="precio-valor">Q{formatPrice(producto.precioConjunto)}</span>
+                        <span className="precio-unidades">({producto.unidadesPorConjunto} unidades)</span>
+                        {producto.precioConjunto && producto.unidadesPorConjunto && (
+                          <span className="precio-descuento">
+                            {(((producto.precioVenta - (producto.precioConjunto / producto.unidadesPorConjunto)) / producto.precioVenta) * 100).toFixed(1)}% desc.
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <button
-                    onClick={() => agregarAlCarrito(producto)}
-                    disabled={producto.stock === 0}
-                    className={`agregar-button ${producto.stock === 0 ? 'disabled' : ''}`}
-                  >
-                    <span className="button-icon">➕</span>
-                    {producto.stock === 0 ? 'Sin Stock' : 'Agregar'}
-                  </button>
+                  {/* Información de stock */}
+                  <div className="producto-stock">
+                    <div className="stock-info">
+                      <span className="stock-label">Stock total:</span>
+                      <span className="stock-valor">{producto.stock || 0} unidades</span>
+                    </div>
+
+                    {producto.tieneConjunto && (() => {
+                      const { unidadesLibres, conjuntosDisponibles } = calcularStockDisponible(producto);
+                      return (
+                        <div className="stock-conjuntos">
+                          <span className="stock-label">{producto.nombreConjunto}s disponibles:</span>
+                          <span className="stock-valor">{conjuntosDisponibles}</span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Botones de agregar */}
+                  <div className="producto-acciones">
+                    {/* Botón para compra individual */}
+                    <button
+                      onClick={() => agregarAlCarrito(producto, 'individual', 1)}
+                      disabled={(() => {
+                        const { unidadesLibres } = calcularStockDisponible(producto);
+                        return unidadesLibres <= 0;
+                      })()}
+                      className={`agregar-button individual ${(() => {
+                        const { unidadesLibres } = calcularStockDisponible(producto);
+                        return unidadesLibres <= 0 ? 'disabled' : '';
+                      })()}`}
+                    >
+                      <span className="button-icon">🛒</span>
+                      {(() => {
+                        const { unidadesLibres } = calcularStockDisponible(producto);
+                        return unidadesLibres <= 0 ? 'Sin stock' : '+ Individual';
+                      })()}
+                    </button>
+
+                    {/* Botón para compra por conjunto (solo si aplica) */}
+                    {producto.tieneConjunto && (
+                      <button
+                        onClick={() => agregarAlCarrito(producto, 'conjunto', 1)}
+                        disabled={(() => {
+                          const { conjuntosDisponibles } = calcularStockDisponible(producto);
+                          return conjuntosDisponibles <= 0;
+                        })()}
+                        className={`agregar-button conjunto ${(() => {
+                          const { conjuntosDisponibles } = calcularStockDisponible(producto);
+                          return conjuntosDisponibles <= 0 ? 'disabled' : '';
+                        })()}`}
+                      >
+                        <span className="button-icon">📦</span>
+                        {(() => {
+                          const { conjuntosDisponibles } = calcularStockDisponible(producto);
+                          return conjuntosDisponibles <= 0 ? `Sin ${producto.nombreConjunto}s` : `+ ${producto.nombreConjunto}`;
+                        })()}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              ))
-            )}
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Panel derecho - Carrito de venta */}
+        {/* Panel del carrito - SECCIÓN COMPLETA */}
         <div className="carrito-panel">
+          {/* Header del carrito */}
           <div className="carrito-header">
-            <h2 className="panel-title">
+            <div className="panel-title">
               <span className="panel-icon">🛒</span>
-              Carrito de Venta
-            </h2>
+              Carrito ({carritoPos.length})
+            </div>
             {carritoPos.length > 0 && (
-              <button
-                onClick={vaciarCarrito}
-                className="vaciar-button"
-              >
+              <button onClick={vaciarCarrito} className="vaciar-button">
                 <span className="button-icon">🗑️</span>
                 Vaciar
               </button>
@@ -304,14 +460,15 @@ function PuntoDeVenta({
                 type="text"
                 placeholder="Nombre del cliente *"
                 value={cliente.nombre}
-                onChange={(e) => setCliente(prev => ({...prev, nombre: e.target.value}))}
+                onChange={(e) => setCliente(prev => ({ ...prev, nombre: e.target.value }))}
                 className="cliente-input"
+                required
               />
               <input
-                type="tel"
+                type="text"
                 placeholder="Teléfono (opcional)"
                 value={cliente.telefono}
-                onChange={(e) => setCliente(prev => ({...prev, telefono: e.target.value}))}
+                onChange={(e) => setCliente(prev => ({ ...prev, telefono: e.target.value }))}
                 className="cliente-input"
               />
             </div>
@@ -321,78 +478,89 @@ function PuntoDeVenta({
           <div className="carrito-items">
             {carritoPos.length === 0 ? (
               <div className="carrito-vacio">
-                <span className="carrito-vacio-icon">🛒</span>
+                <div className="carrito-vacio-icon">🛒</div>
                 <p className="carrito-vacio-text">El carrito está vacío</p>
-                <p className="carrito-vacio-subtext">Agrega productos del catálogo</p>
+                <p className="carrito-vacio-subtitle">Agrega productos para comenzar la venta</p>
               </div>
             ) : (
-              <div className="carrito-list">
-                {carritoPos.map(item => (
-                  <div key={item._id} className="carrito-item">
-                    <div className="item-image-container">
-                      <img
-                        src={item.imagenUrl || "https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?w=60&h=60&fit=crop"}
-                        alt={item.nombre}
-                        className="item-image"
-                        onError={(e) => {
-                          e.target.src = "https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?w=60&h=60&fit=crop";
-                        }}
-                      />
-                    </div>
-                    
-                    <div className="item-info">
-                      <h4 className="item-nombre">{item.nombre}</h4>
-                      <p className="item-precio">Q{formatPrice(item.precioVenta)} c/u</p>
-                      <p className="item-subtotal">
-                        Subtotal: Q{formatPrice(item.precioVenta * item.cantidad)}
-                      </p>
-                    </div>
+              carritoPos.map(item => (
+                <div key={item.claveUnica} className="carrito-item">
+                  <div className="item-info">
+                    <h4 className="item-nombre">{item.nombre}</h4>
+                    <p className="item-tipo">
+                      {item.tipoVenta === 'conjunto' ?
+                        `${item.nombreConjunto} (${item.unidadesPorConjunto} unidades)` :
+                        'Individual'
+                      }
+                    </p>
+                    <p className="item-precio">
+                      Q{formatPrice(item.tipoVenta === 'conjunto' ? item.precioConjunto : item.precioVenta)}
+                    </p>
+                  </div>
 
-                    <div className="item-controls">
-                      <div className="quantity-control">
-                        <button
-                          onClick={() => actualizarCantidad(item._id, item.cantidad - 1)}
-                          className="quantity-button"
-                        >
-                          −
-                        </button>
-                        <span className="quantity-display">{item.cantidad}</span>
-                        <button
-                          onClick={() => actualizarCantidad(item._id, item.cantidad + 1)}
-                          className="quantity-button"
-                        >
-                          +
-                        </button>
-                      </div>
+                  <div className="item-controls">
+                    <div className="cantidad-controls">
                       <button
-                        onClick={() => eliminarDelCarrito(item._id)}
-                        className="remove-button"
+                        onClick={() => actualizarCantidad(item._id, item.cantidad - 1, item.tipoVenta)}
+                        className="cantidad-button minus"
                       >
-                        ×
+                        -
+                      </button>
+                      <span className="cantidad-display">{item.cantidad}</span>
+                      <button
+                        onClick={() => actualizarCantidad(item._id, item.cantidad + 1, item.tipoVenta)}
+                        className="cantidad-button plus"
+                      >
+                        +
                       </button>
                     </div>
+
+                    <button
+                      onClick={() => eliminarDelCarrito(item._id, item.tipoVenta)}
+                      className="eliminar-button"
+                    >
+                      🗑️
+                    </button>
                   </div>
-                ))}
-              </div>
+
+                  <div className="item-subtotal">
+                    Q{formatPrice((item.tipoVenta === 'conjunto' ? item.precioConjunto : item.precioVenta) * item.cantidad)}
+                  </div>
+                </div>
+              ))
             )}
           </div>
 
-          {/* Resumen y total */}
+          {/* Resumen de venta */}
+          {/* Método de pago - SIEMPRE VISIBLE */}
+          <div className="metodo-pago-container">
+            <label className="metodo-pago-label">Método de pago:</label>
+            <select
+              value={metodoPago}
+              onChange={(e) => setMetodoPago(e.target.value)}
+              className="metodo-pago-select"
+            >
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="mixto">Mixto</option>
+            </select>
+          </div>
+
+          {/* Resumen solo cuando hay productos */}
           {carritoPos.length > 0 && (
-            <div className="resumen-section">
+            <div className="resumen-venta">
               <div className="resumen-item">
-                <span className="resumen-label">Productos:</span>
-                <span className="resumen-value">
-                  {carritoPos.reduce((sum, item) => sum + item.cantidad, 0)}
-                </span>
+                <span className="resumen-label">Subtotal:</span>
+                <span className="resumen-value">Q{formatPrice(calcularTotal())}</span>
               </div>
               <div className="resumen-item">
-                <span className="resumen-label">Ganancia:</span>
+                <span className="resumen-label">Ganancia estimada:</span>
                 <span className="resumen-ganancia">Q{formatPrice(calcularGanancias())}</span>
               </div>
               <div className="resumen-divider"></div>
               <div className="total-row">
-                <span className="total-label">TOTAL:</span>
+                <span className="total-label">Total:</span>
                 <span className="total-amount">Q{formatPrice(calcularTotal())}</span>
               </div>
             </div>
@@ -402,7 +570,7 @@ function PuntoDeVenta({
           <button
             onClick={procesarVenta}
             disabled={carritoPos.length === 0 || !cliente.nombre.trim() || isLoading}
-            className={`procesar-venta-button ${(carritoPos.length === 0 || !cliente.nombre.trim() || isLoading) ? 'disabled' : ''}`}
+            className={`procesar-venta-button ${carritoPos.length === 0 || !cliente.nombre.trim() || isLoading ? 'disabled' : ''}`}
           >
             <span className="button-icon">
               {isLoading ? '⏳' : '💳'}

@@ -3,18 +3,17 @@ const router = express.Router();
 const Producto = require('../models/Product');
 const Order = require('../models/Order');
 const authMiddleware = require('../middleware/authMiddleware');
-const adminMiddleware = require('../middleware/adminMiddleware'); // Importado para rutas admin
+const adminMiddleware = require('../middleware/adminMiddleware');
 const orderController = require('../controllers/orderController');
 
 // POST /api/pedidos/confirmar
-// La ruta ahora es solo '/confirmar' porque se montará bajo '/api/pedidos'
 router.post('/confirmar', authMiddleware, async (req, res) => {
   try {
     const itemsDelPedido = req.body;
     const userId = req.user._id;
 
     let totalPedido = 0;
-    let gananciaTotalPedido = 0; // NUEVO: Variable para calcular ganancia total
+    let gananciaTotalPedido = 0;
     const productosParaGuardarEnOrden = [];
 
     // Primero verificamos stock y calculamos totales
@@ -24,43 +23,80 @@ router.post('/confirmar', authMiddleware, async (req, res) => {
         return res.status(404).json({ error: `Producto no encontrado: ${item.nombre || item._id}` });
       }
 
+      // Determinar el tipo de venta
+      const tipoVenta = item.tipoVenta || 'individual';
+      
+      // Validar stock disponible
       if (producto.stock < item.cantidad) {
         return res.status(400).json({ error: `Stock insuficiente para el producto: ${producto.nombre}. Stock disponible: ${producto.stock}` });
       }
 
-      // Calcular ganancia por producto
-      const gananciaProducto = (producto.precioVenta - producto.precioCompra) * item.cantidad;
-      const subtotalProducto = producto.precioVenta * item.cantidad;
+      // Calcular ganancia y subtotal
+      let gananciaProducto, subtotalProducto;
+      
+      if (tipoVenta === 'conjunto') {
+        // Para conjuntos: calcular basado en el precio del conjunto
+        const cantidadConjuntos = item.cantidadOriginal || Math.floor(item.cantidad / (producto.unidadesPorConjunto || 1));
+        const precioCompraConjunto = producto.precioCompra * (producto.unidadesPorConjunto || 1);
+        
+        gananciaProducto = (producto.precioConjunto - precioCompraConjunto) * cantidadConjuntos;
+        subtotalProducto = producto.precioConjunto * cantidadConjuntos;
+      } else {
+        // Para individuales: calcular normalmente
+        gananciaProducto = (producto.precioVenta - producto.precioCompra) * item.cantidad;
+        subtotalProducto = producto.precioVenta * item.cantidad;
+      }
 
+      // Preparar datos para guardar en la orden
       productosParaGuardarEnOrden.push({
         productId: producto._id,
         nombre: producto.nombre,
-        cantidad: item.cantidad,
-        precioVenta: producto.precioVenta,
-        precioCompra: producto.precioCompra, // NUEVO: Guardamos precio de compra
+        cantidad: tipoVenta === 'conjunto' ? 
+          (item.cantidadOriginal || Math.floor(item.cantidad / (producto.unidadesPorConjunto || 1))) : 
+          item.cantidad,
+        precioVenta: tipoVenta === 'conjunto' ? producto.precioConjunto : producto.precioVenta,
+        precioCompra: tipoVenta === 'conjunto' ? 
+          (producto.precioCompra * (producto.unidadesPorConjunto || 1)) : 
+          producto.precioCompra,
         imagenUrl: producto.imagenUrl,
-        ganancia: gananciaProducto // NUEVO: Guardamos ganancia por producto
+        ganancia: gananciaProducto,
+        // Campos adicionales para el nuevo sistema
+        tipoVenta: tipoVenta,
+        cantidadOriginal: tipoVenta === 'conjunto' ? 
+          (item.cantidadOriginal || Math.floor(item.cantidad / (producto.unidadesPorConjunto || 1))) : 
+          item.cantidad,
+        ...(tipoVenta === 'conjunto' && {
+          nombreConjunto: producto.nombreConjunto,
+          unidadesPorConjunto: producto.unidadesPorConjunto,
+          precioConjunto: producto.precioConjunto,
+          descripcionVenta: `${item.cantidadOriginal || Math.floor(item.cantidad / (producto.unidadesPorConjunto || 1))} ${producto.nombreConjunto}(s)`
+        }),
+        ...(tipoVenta === 'individual' && {
+          descripcionVenta: `${item.cantidad} unidad(es)`
+        })
       });
 
       totalPedido += subtotalProducto;
-      gananciaTotalPedido += gananciaProducto; // NUEVO: Sumamos a la ganancia total
+      gananciaTotalPedido += gananciaProducto;
 
-      console.log(`📊 Producto: ${producto.nombre} - Ganancia: Q${gananciaProducto.toFixed(2)}`);
+      console.log(`📊 Producto: ${producto.nombre} - Tipo: ${tipoVenta} - Ganancia: Q${gananciaProducto.toFixed(2)}`);
     }
 
-    // Ahora actualizamos el stock
+    // Actualizar stock (siempre en unidades totales)
     for (let item of itemsDelPedido) {
       const producto = await Producto.findById(item._id);
-      producto.stock -= item.cantidad;
+      producto.stock -= item.cantidad; // item.cantidad ya viene en unidades del frontend
       await producto.save();
+      
+      console.log(`📦 Stock actualizado para ${producto.nombre}: -${item.cantidad} unidades (restante: ${producto.stock})`);
     }
 
-    // Crear el pedido con la ganancia calculada
+    // Crear el pedido
     const nuevoPedido = new Order({
       userId: userId,
       productos: productosParaGuardarEnOrden,
       total: totalPedido,
-      gananciaTotal: gananciaTotalPedido, // NUEVO: Guardamos ganancia total
+      gananciaTotal: gananciaTotalPedido,
       fecha: new Date(),
       estado: 'confirmado'
     });
@@ -69,8 +105,8 @@ router.post('/confirmar', authMiddleware, async (req, res) => {
 
     console.log(`✅ Pedido confirmado - Total: Q${totalPedido.toFixed(2)} - Ganancia: Q${gananciaTotalPedido.toFixed(2)}`);
 
-    return res.status(200).json({ 
-      mensaje: 'Pedido confirmado y stock actualizado. Pedido guardado.', 
+    return res.status(200).json({
+      mensaje: 'Pedido confirmado y stock actualizado. Pedido guardado.',
       pedidoId: nuevoPedido._id,
       total: totalPedido,
       gananciaTotal: gananciaTotalPedido
@@ -82,19 +118,15 @@ router.post('/confirmar', authMiddleware, async (req, res) => {
 });
 
 // GET /api/pedidos/mis-pedidos (PROTEGIDA para usuario normal)
-// La ruta ahora es solo '/mis-pedidos' porque se montará bajo '/api/pedidos'
 router.get('/mis-pedidos', authMiddleware, orderController.obtenerMisPedidos);
 
 // GET /api/pedidos/todos (PROTEGIDA para administradores)
-// La ruta ahora es solo '/todos' porque se montará bajo '/api/pedidos'
 router.get('/todos', authMiddleware, adminMiddleware, orderController.obtenerPedidos);
 
 // PUT /api/pedidos/:id/estado (PROTEGIDA para administradores)
-// La ruta ahora es solo '/:id/estado' porque se montará bajo '/api/pedidos'
 router.put('/:id/estado', authMiddleware, adminMiddleware, orderController.actualizarEstadoPedido);
 
 // DELETE /api/pedidos/:id/cancelar-cliente (PROTEGIDA para clientes)
-// La ruta ahora es solo '/:id/cancelar-cliente' porque se montará bajo '/api/pedidos'
 router.delete('/:id/cancelar-cliente', authMiddleware, orderController.cancelarPedidoCliente);
 
 module.exports = router;

@@ -10,7 +10,13 @@ function CrearProducto() {
     precioCompra: '',
     precioVenta: '',
     categoria: '',
-    stock: ''
+    stock: '',
+    // CAMPOS PARA SISTEMA DUAL
+    tieneConjunto: false,
+    nombreConjunto: '',
+    unidadesPorConjunto: '',
+    precioConjunto: ''
+    // stockConjuntos se calcula automáticamente
   });
 
   const [imagen, setImagen] = useState(null);
@@ -28,7 +34,7 @@ function CrearProducto() {
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const id = queryParams.get('id');
-    
+
     if (id) {
       setIsEditing(true);
       setProductId(id);
@@ -48,7 +54,12 @@ function CrearProducto() {
             precioCompra: productoData.precioCompra || '',
             precioVenta: productoData.precioVenta || '',
             categoria: productoData.categoria || '',
-            stock: productoData.stock || ''
+            stock: productoData.stock || '',
+            // CAMPOS DEL SISTEMA DUAL
+            tieneConjunto: productoData.tieneConjunto || false,
+            nombreConjunto: productoData.nombreConjunto || '',
+            unidadesPorConjunto: productoData.unidadesPorConjunto || '',
+            precioConjunto: productoData.precioConjunto || ''
           });
           if (productoData.imagenUrl) {
             setPreviewImage(productoData.imagenUrl);
@@ -57,7 +68,7 @@ function CrearProducto() {
         } catch (err) {
           console.error("Error al obtener producto para edición:", err);
           setError('No se pudo cargar el producto para edición 😓');
-          setFormulario({ nombre: '', descripcion: '', precioCompra: '', precioVenta: '', categoria: '', stock: '' });
+          setFormulario({ nombre: '', descripcion: '', precioCompra: '', precioVenta: '', categoria: '', stock: '', tieneConjunto: false, nombreConjunto: '', unidadesPorConjunto: '', precioConjunto: '' });
         } finally {
           setIsLoading(false);
         }
@@ -72,8 +83,14 @@ function CrearProducto() {
         precioCompra: '',
         precioVenta: '',
         categoria: '',
-        stock: ''
+        stock: '',
+        tieneConjunto: false,
+        nombreConjunto: '',
+        unidadesPorConjunto: '',
+        precioConjunto: ''
       });
+      setImagen(null);
+      setPreviewImage(null);
     }
   }, [location.search]);
 
@@ -90,7 +107,7 @@ function CrearProducto() {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     setImagen(file);
-    
+
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -113,6 +130,20 @@ function CrearProducto() {
     }
     if (formulario.stock && (isNaN(formulario.stock) || parseInt(formulario.stock) < 0)) {
       newErrors.stock = 'El stock debe ser un número entero no negativo.';
+    }
+    // Validaciones para sistema dual
+    if (formulario.tieneConjunto) {
+      if (!formulario.nombreConjunto || formulario.nombreConjunto.trim() === '') {
+        newErrors.nombreConjunto = 'El nombre del conjunto es requerido.';
+      }
+
+      if (!formulario.unidadesPorConjunto || isNaN(formulario.unidadesPorConjunto) || parseInt(formulario.unidadesPorConjunto) <= 0) {
+        newErrors.unidadesPorConjunto = 'Las unidades por conjunto deben ser un número mayor a 0.';
+      }
+
+      if (!formulario.precioConjunto || isNaN(formulario.precioConjunto) || parseFloat(formulario.precioConjunto) < 0) {
+        newErrors.precioConjunto = 'El precio del conjunto debe ser un número no negativo.';
+      }
     }
     setValidationErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -146,9 +177,9 @@ function CrearProducto() {
         response = await axios.post('/productos', formData);
         setMensaje('✅ Producto creado exitosamente');
       }
-      
+
       setError('');
-      
+
       if (!isEditing) {
         setFormulario({
           nombre: '',
@@ -156,14 +187,18 @@ function CrearProducto() {
           precioCompra: '',
           precioVenta: '',
           categoria: '',
-          stock: ''
+          stock: '',
+          tieneConjunto: false,
+          nombreConjunto: '',
+          unidadesPorConjunto: '',
+          precioConjunto: ''
         });
         setImagen(null);
         setPreviewImage(null);
       }
-      
+
       setValidationErrors({});
-      
+
       // Auto-limpiar mensaje después de 3 segundos
       setTimeout(() => {
         setMensaje('');
@@ -171,7 +206,7 @@ function CrearProducto() {
           navigate('/admin-panel');
         }
       }, 3000);
-      
+
     } catch (err) {
       setError('❌ Error al guardar producto: ' + (err.response?.data?.error || err.message));
       setMensaje('');
@@ -200,6 +235,10 @@ function CrearProducto() {
   return (
     <div style={pageWrapperStyle}>
       {/* Hero Header */}
+      <br/>
+      <br/>
+      <br/>
+      <br/>
       <div style={heroHeaderStyle}>
         <div style={heroContentStyle}>
           <h1 style={heroTitleStyle}>
@@ -207,7 +246,7 @@ function CrearProducto() {
             {isEditing ? 'Editar Producto' : 'Crear Nuevo Producto'}
           </h1>
           <p style={heroSubtitleStyle}>
-            {isEditing 
+            {isEditing
               ? 'Actualiza la información de tu producto'
               : 'Agrega un nuevo producto a tu inventario de Art Mary'
             }
@@ -216,7 +255,7 @@ function CrearProducto() {
       </div>
 
       {/* Contenido principal */}
-      <div style={mainContentStyle}>
+      <div style={mainContentStyle} className="main-content">
         {/* Breadcrumb */}
         <div style={breadcrumbStyle}>
           <Link to="/admin-panel" style={breadcrumbLinkStyle}>
@@ -256,7 +295,7 @@ function CrearProducto() {
         {/* Formulario */}
         <div style={formContainerStyle}>
           <form onSubmit={handleSubmit} style={formStyle}>
-            <div style={formGridStyle}>
+            <div style={formGridStyle} className="form-grid">
               {/* Columna izquierda - Información básica */}
               <div style={formSectionStyle}>
                 <h3 style={sectionTitleStyle}>
@@ -312,7 +351,7 @@ function CrearProducto() {
                   Precios e Inventario
                 </h3>
 
-                <div style={priceRowStyle}>
+                <div style={priceRowStyle} className="price-row">
                   <div style={fieldGroupStyle}>
                     <label style={labelStyle}>Precio de Compra *</label>
                     <div style={inputWithPrefixStyle}>
@@ -376,13 +415,100 @@ function CrearProducto() {
                   )}
                 </div>
 
+                {/* ===== NUEVOS CAMPOS PARA SISTEMA DUAL ===== */}
+                <div style={fieldGroupStyle}>
+                  <label style={labelStyle}>
+                    <input
+                      type="checkbox"
+                      name="tieneConjunto"
+                      checked={formulario.tieneConjunto}
+                      onChange={(e) => setFormulario(prev => ({
+                        ...prev,
+                        tieneConjunto: e.target.checked,
+                        // Limpiar campos si se deshabilita
+                        nombreConjunto: e.target.checked ? prev.nombreConjunto : '',
+                        unidadesPorConjunto: e.target.checked ? prev.unidadesPorConjunto : '',
+                        precioConjunto: e.target.checked ? prev.precioConjunto : ''
+                      }))}
+                      style={{ marginRight: '8px' }}
+                    />
+                    ¿Se vende también por conjuntos? (Ej: cajas, resmas, bolsas)
+                  </label>
+                </div>
+
+                {/* Campos adicionales solo si tieneConjunto es true */}
+                {formulario.tieneConjunto && (
+                  <div style={{
+                    border: '2px dashed #e5e7eb',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginTop: '12px',
+                    backgroundColor: '#f9fafb'
+                  }}>
+                    <h4 style={{ margin: '0 0 16px 0', color: '#374151', fontSize: '16px' }}>
+                      📦 Configuración de Conjunto
+                    </h4>
+
+                    <div style={fieldGroupStyle}>
+                      <label style={labelStyle}>Nombre del Conjunto *</label>
+                      <input
+                        name="nombreConjunto"
+                        value={formulario.nombreConjunto}
+                        onChange={handleChange}
+                        placeholder="Ej. Caja, Resma, Bolsa, Paquete"
+                        style={inputStyle}
+                        required={formulario.tieneConjunto}
+                      />
+                    </div>
+
+                    <div style={fieldGroupStyle}>
+                      <label style={labelStyle}>Unidades por Conjunto *</label>
+                      <input
+                        name="unidadesPorConjunto"
+                        type="number"
+                        min="1"
+                        value={formulario.unidadesPorConjunto}
+                        onChange={handleChange}
+                        placeholder="Ej. 100"
+                        style={inputStyle}
+                        required={formulario.tieneConjunto}
+                      />
+                    </div>
+
+                    <div style={fieldGroupStyle}>
+                      <label style={labelStyle}>Precio del Conjunto *</label>
+                      <input
+                        name="precioConjunto"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formulario.precioConjunto}
+                        onChange={handleChange}
+                        placeholder="Ej. 85.00"
+                        style={inputStyle}
+                        required={formulario.tieneConjunto}
+                      />
+                      {formulario.precioVenta && formulario.unidadesPorConjunto && formulario.precioConjunto && (
+                        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                          Precio por unidad en conjunto: Q{(formulario.precioConjunto / formulario.unidadesPorConjunto).toFixed(2)}
+                          {formulario.precioVenta && (
+                            <span style={{ color: '#059669', fontWeight: 'bold' }}>
+                              {' '}(Descuento: {(((formulario.precioVenta - (formulario.precioConjunto / formulario.unidadesPorConjunto)) / formulario.precioVenta) * 100).toFixed(1)}%)
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Sección de imagen */}
                 <div style={imageSection}>
                   <h4 style={imageSectionTitleStyle}>
                     <span style={sectionIconStyle}>📸</span>
                     Imagen del Producto
                   </h4>
-                  
+
                   <div style={imageUploadContainerStyle}>
                     <input
                       type="file"
@@ -394,9 +520,9 @@ function CrearProducto() {
                     <label htmlFor="image-upload" style={imageUploadLabelStyle}>
                       {previewImage ? (
                         <div style={imagePreviewContainerStyle}>
-                          <img 
-                            src={previewImage} 
-                            alt="Preview" 
+                          <img
+                            src={previewImage}
+                            alt="Preview"
                             style={imagePreviewStyle}
                           />
                           <div style={imageOverlayStyle}>
@@ -418,7 +544,7 @@ function CrearProducto() {
             </div>
 
             {/* Botones de acción */}
-            <div style={actionsContainerStyle}>
+            <div style={actionsContainerStyle} className="actions-container">
               <button
                 type="button"
                 onClick={handleCancel}
@@ -435,7 +561,7 @@ function CrearProducto() {
                 <span style={buttonIconStyle}>❌</span>
                 Cancelar
               </button>
-              
+
               <button
                 type="submit"
                 disabled={isLoading}
@@ -517,7 +643,7 @@ const mainContentStyle = {
   maxWidth: '1200px',
   margin: '0 auto',
   padding: '0 2rem',
-  marginTop: '-2rem',
+  marginTop: '5rem', 
   position: 'relative',
   zIndex: 2
 };
@@ -804,7 +930,11 @@ const actionsContainerStyle = {
   justifyContent: 'flex-end',
   gap: '1rem',
   paddingTop: '2rem',
-  borderTop: '1px solid var(--neutral-200)'
+  borderTop: '1px solid var(--neutral-200)',
+  '@media (max-width: 768px)': {
+    flexDirection: 'column',
+    justifyContent: 'center',
+  }
 };
 
 const cancelButtonStyle = {
@@ -819,7 +949,8 @@ const cancelButtonStyle = {
   fontSize: '1rem',
   fontWeight: '600',
   cursor: 'pointer',
-  transition: 'all 0.3s ease'
+  transition: 'all 0.3s ease',
+  flex: 1,
 };
 
 const submitButtonStyle = {
@@ -835,14 +966,15 @@ const submitButtonStyle = {
   fontWeight: '700',
   cursor: 'pointer',
   transition: 'all 0.3s ease',
-  boxShadow: '0 8px 25px rgba(236, 72, 153, 0.3)'
+  boxShadow: '0 8px 25px rgba(236, 72, 153, 0.3)',
+  flex: 1,
 };
 
 const buttonIconStyle = {
   fontSize: '1.125rem'
 };
 
-// CSS adicional para efectos
+// CSS adicional para efectos y media queries
 const additionalStyles = `
 @keyframes slideInDown {
   from {
@@ -884,6 +1016,11 @@ const additionalStyles = `
   .hero-title {
     flex-direction: column !important;
     gap: 0.5rem !important;
+  }
+  
+  .main-content {
+    padding-top: 5rem !important; /* Ajuste para compensar el header en móviles */
+    margin-top: 0 !important;
   }
 }
 

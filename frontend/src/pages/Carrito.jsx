@@ -16,17 +16,23 @@ function Carrito() {
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
 
   const total = carrito.reduce(
-    (acum, item) => acum + item.precioVenta * item.cantidad,
+    (acum, item) => {
+      const precio = item.tipoVenta === 'conjunto' ?
+        item.precioConjunto :
+        item.precioVenta;
+      return acum + (precio * item.cantidad);
+    },
     0
   );
 
-  const handleEliminarItem = (id, nombre) => {
-    setItemsAnimandose(prev => new Set(prev).add(id));
+  const handleEliminarItem = (id, nombre, tipoVenta = 'individual') => {
+    const claveUnica = `${id}-${tipoVenta}`;
+    setItemsAnimandose(prev => new Set(prev).add(claveUnica));
     setTimeout(() => {
-      eliminarDelCarrito(id);
+      eliminarDelCarrito(id, tipoVenta);
       setItemsAnimandose(prev => {
         const newSet = new Set(prev);
-        newSet.delete(id);
+        newSet.delete(claveUnica);
         return newSet;
       });
     }, 300);
@@ -41,17 +47,18 @@ function Carrito() {
     setMostrarConfirmacion(false);
   };
 
-  const handleCantidadChange = (id, accion) => {
-    setItemsAnimandose(prev => new Set(prev).add(id));
+  const handleCantidadChange = (id, accion, tipoVenta = 'individual') => {
+    const claveUnica = `${id}-${tipoVenta}`;
+    setItemsAnimandose(prev => new Set(prev).add(claveUnica));
     setTimeout(() => {
       if (accion === 'aumentar') {
-        aumentarCantidad(id);
+        aumentarCantidad(id, tipoVenta);
       } else {
-        disminuirCantidad(id);
+        disminuirCantidad(id, tipoVenta);
       }
       setItemsAnimandose(prev => {
         const newSet = new Set(prev);
-        newSet.delete(id);
+        newSet.delete(claveUnica);
         return newSet;
       });
     }, 150);
@@ -60,14 +67,15 @@ function Carrito() {
   return (
     <div style={containerStyle}>
       {/* Hero Header */}
+      <br/><br/><br/><br/>
       <div style={heroHeaderStyle}>
         <div style={heroContentStyle}>
-          <h1 style={heroTitleStyle}>
+          <h1 style={heroTitleStyle} className="hero-title">
             <span style={heroIconStyle}>🛒</span>
             Mi Carrito de Compras
           </h1>
           <p style={heroSubtitleStyle}>
-            {carrito.length === 0 
+            {carrito.length === 0
               ? 'Tu carrito está esperando ser llenado de creatividad'
               : `${carrito.length} ${carrito.length === 1 ? 'producto' : 'productos'} seleccionados`
             }
@@ -77,28 +85,30 @@ function Carrito() {
 
       <div style={mainContentStyle}>
         {carrito.length === 0 ? (
-          /* Estado vacío */
-          <div style={emptyStateStyle}>
-            <div style={emptyIconContainerStyle}>
-              <div style={emptyIconStyle}>🛍️</div>
-            </div>
-            <h2 style={emptyTitleStyle}>Tu carrito está vacío</h2>
-            <p style={emptySubtitleStyle}>
-              ¡Es hora de llenarlo con productos increíbles! Explora nuestro catálogo y encuentra todo lo que necesitas.
-            </p>
-            <Link to="/productos" style={emptyButtonStyle}>
-              <span style={buttonIconStyle}>✨</span>
-              Explorar Productos
-            </Link>
-            <div style={emptyDecorationsStyle}>
-              <div style={floatingHeartStyle}>💕</div>
-              <div style={{...floatingHeartStyle, ...floatingHeart2Style}}>🌸</div>
-              <div style={{...floatingHeartStyle, ...floatingHeart3Style}}>🎨</div>
+          /* Estado vacío con fondo de tarjeta */
+          <div style={emptyCardStyle}>
+            <div style={emptyStateStyle}>
+              <div style={emptyIconContainerStyle}>
+                <div style={emptyIconStyle}>🛍️</div>
+              </div>
+              <h2 style={emptyTitleStyle}>Tu carrito está vacío</h2>
+              <p style={emptySubtitleStyle}>
+                ¡Es hora de llenarlo con productos increíbles! Explora nuestro catálogo y encuentra todo lo que necesitas.
+              </p>
+              <Link to="/productos" style={emptyButtonStyle} className="empty-button">
+                <span style={buttonIconStyle}>✨</span>
+                Explorar Productos
+              </Link>
+              <div style={emptyDecorationsStyle}>
+                <div style={floatingHeartStyle}>💕</div>
+                <div style={{ ...floatingHeartStyle, ...floatingHeart2Style }}>🌸</div>
+                <div style={{ ...floatingHeartStyle, ...floatingHeart3Style }}>🎨</div>
+              </div>
             </div>
           </div>
         ) : (
           /* Contenido del carrito */
-          <div style={cartContentStyle}>
+          <div style={cartContentStyle} className="cart-content">
             {/* Items del carrito */}
             <div style={itemsContainerStyle}>
               <div style={itemsHeaderStyle}>
@@ -109,6 +119,7 @@ function Carrito() {
                 <button
                   onClick={handleVaciarCarrito}
                   style={clearCartButtonStyle}
+                  className="clear-cart-button"
                 >
                   <span style={buttonIconStyle}>🗑️</span>
                   Vaciar Carrito
@@ -118,13 +129,13 @@ function Carrito() {
               <div style={itemsListStyle}>
                 {carrito.map((producto, index) => (
                   <div
-                    key={producto._id}
+                    key={`${producto._id}-${producto.tipoVenta || 'individual'}`}
                     style={{
                       ...itemCardStyle,
-                      ...(itemsAnimandose.has(producto._id) ? itemAnimatingStyle : {}),
+                      ...(itemsAnimandose.has(`${producto._id}-${producto.tipoVenta}`) ? itemAnimatingStyle : {}),
                       animationDelay: `${index * 100}ms`
                     }}
-                    className="cart-item animate-slideIn"
+                    className="cart-item item-card animate-slideIn"
                   >
                     {/* Imagen del producto */}
                     <div style={itemImageContainerStyle}>
@@ -139,51 +150,97 @@ function Carrito() {
                       <div style={itemBadgeStyle}>
                         {producto.cantidad}
                       </div>
+                      {/* Badge de tipo de venta */}
+                      {producto.tipoVenta === 'conjunto' && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '-8px',
+                          left: '-8px',
+                          background: 'linear-gradient(135deg, #059669, #047857)',
+                          color: 'white',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          boxShadow: '0 2px 8px rgba(5, 150, 105, 0.3)'
+                        }}>
+                          📦 {producto.nombreConjunto}
+                        </div>
+                      )}
                     </div>
 
                     {/* Información del producto */}
                     <div style={itemInfoStyle}>
-                      <h3 style={itemNameStyle}>{producto.nombre}</h3>
-                      <p style={itemPriceStyle}>Q{producto.precioVenta.toFixed(2)} c/u</p>
+                      <h3 style={itemNameStyle}>
+                        {producto.nombre}
+                        {producto.tipoVenta === 'conjunto' && (
+                          <span style={{ fontSize: '0.875rem', color: '#059669', fontWeight: '500', marginLeft: '8px' }}>
+                            ({producto.nombreConjunto})
+                          </span>
+                        )}
+                      </h3>
+
+                      {/* Precios según tipo */}
+                      {producto.tipoVenta === 'conjunto' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <p style={itemPriceStyle}>Q{producto.precioConjunto.toFixed(2)} por {producto.nombreConjunto}</p>
+                          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                            ({producto.unidadesPorConjunto} unidades • Q{(producto.precioConjunto / producto.unidadesPorConjunto).toFixed(2)} c/u)
+                          </p>
+                        </div>
+                      ) : (
+                        <p style={itemPriceStyle}>Q{producto.precioVenta.toFixed(2)} c/u</p>
+                      )}
+
                       <p style={itemSubtotalStyle}>
-                        Subtotal: <span style={subtotalAmountStyle}>Q{(producto.precioVenta * producto.cantidad).toFixed(2)}</span>
+                        Subtotal: <span style={subtotalAmountStyle}>
+                          Q{((producto.tipoVenta === 'conjunto' ? producto.precioConjunto : producto.precioVenta) * producto.cantidad).toFixed(2)}
+                        </span>
                       </p>
                     </div>
 
                     {/* Controles de cantidad */}
-                    <div style={quantityControlsStyle}>
+                    <div style={quantityControlsStyle} className="quantity-controls">
                       <div style={quantityContainerStyle}>
                         <button
-                          onClick={() => handleCantidadChange(producto._id, 'disminuir')}
+                          onClick={() => handleCantidadChange(producto._id, 'disminuir', producto.tipoVenta)}
                           disabled={producto.cantidad === 1}
                           style={{
                             ...quantityButtonStyle,
                             ...(producto.cantidad === 1 ? disabledButtonStyle : {})
                           }}
+                          className="quantity-button"
                         >
                           −
                         </button>
                         <span style={quantityDisplayStyle}>{producto.cantidad}</span>
                         <button
-                          onClick={() => handleCantidadChange(producto._id, 'aumentar')}
-                          disabled={producto.cantidad >= producto.stock}
+                          onClick={() => handleCantidadChange(producto._id, 'aumentar', producto.tipoVenta)}
+                          disabled={producto.cantidad >= (producto.tipoVenta === 'conjunto' ?
+                            Math.floor((producto.stock || 0) / (producto.unidadesPorConjunto || 1)) :
+                            producto.stock)}
                           style={{
                             ...quantityButtonStyle,
-                            ...(producto.cantidad >= producto.stock ? disabledButtonStyle : {})
+                            ...(producto.cantidad >= (producto.tipoVenta === 'conjunto' ? Math.floor((producto.stock || 0) / (producto.unidadesPorConjunto || 1)) : producto.stock) ? disabledButtonStyle : {})
                           }}
+                          className="quantity-button"
                         >
                           +
                         </button>
                       </div>
                       <div style={stockInfoStyle}>
-                        Stock: {producto.stock}
+                        Stock: {producto.tipoVenta === 'conjunto' ?
+                          Math.floor((producto.stock || 0) / (producto.unidadesPorConjunto || 1)) :
+                          producto.stock}
+                        {producto.tipoVenta === 'conjunto' && ` ${producto.nombreConjunto}s`}
                       </div>
                     </div>
 
                     {/* Botón eliminar */}
                     <button
-                      onClick={() => handleEliminarItem(producto._id, producto.nombre)}
+                      onClick={() => handleEliminarItem(producto._id, producto.nombre, producto.tipoVenta)}
                       style={removeButtonStyle}
+                      className="remove-button"
                       title={`Eliminar ${producto.nombre}`}
                     >
                       <span style={removeIconStyle}>×</span>
@@ -194,7 +251,7 @@ function Carrito() {
             </div>
 
             {/* Resumen del carrito */}
-            <div style={summaryContainerStyle}>
+            <div style={summaryContainerStyle} className="summary-container">
               <div style={summaryCardStyle}>
                 <h2 style={summaryTitleStyle}>
                   <span style={summaryIconStyle}>📊</span>
@@ -213,18 +270,18 @@ function Carrito() {
                     </span>
                   </div>
                   <div style={summaryDividerStyle}></div>
-                  <div style={{...summaryRowStyle, ...totalRowStyle}}>
+                  <div style={{ ...summaryRowStyle, ...totalRowStyle }}>
                     <span style={totalLabelStyle}>Total:</span>
                     <span style={totalAmountStyle}>Q{total.toFixed(2)}</span>
                   </div>
                 </div>
 
                 <div style={actionsContainerStyle}>
-                  <Link to="/confirmar" style={confirmOrderButtonStyle}>
+                  <Link to="/confirmar" style={confirmOrderButtonStyle} className="confirm-order-button">
                     <span style={buttonIconStyle}>📝</span>
                     Confirmar el Pedido
                   </Link>
-                  <Link to="/productos" style={continueShoppingStyle}>
+                  <Link to="/productos" style={continueShoppingStyle} className="continue-shopping">
                     <span style={buttonIconStyle}>🛍️</span>
                     Seguir Comprando
                   </Link>
@@ -315,10 +372,21 @@ const mainContentStyle = {
   padding: '0 2rem'
 };
 
+const emptyCardStyle = {
+  background: 'white',
+  borderRadius: '2rem',
+  padding: '4rem 2rem',
+  boxShadow: '0 20px 60px rgba(0, 0, 0, 0.1)',
+  border: '1px solid var(--neutral-200)',
+  marginTop: '-2rem', // Compensar el margen para que esté alineado con el resto del contenido
+  position: 'relative',
+  zIndex: 2
+};
+
 const emptyStateStyle = {
   textAlign: 'center',
-  padding: '4rem 2rem',
-  position: 'relative'
+  position: 'relative',
+  padding: '0 1rem' // Ajustar el padding interno
 };
 
 const emptyIconContainerStyle = {

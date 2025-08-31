@@ -1,336 +1,407 @@
-// src/pages/Login.jsx - DISEÑO MODERNO ART MARY
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+// src/pages/Login.jsx - DISEÑO COMPLETAMENTE RESPONSIVE
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import logo from '../assets/artmary-logo.png';
 import { useAuth } from '../context/AuthContext';
-import fondoArtMary from '../assets/Fondo Art Mary.jpg';
-import logo from '../assets/artmary-logo.png'; // ¡NUEVO IMPORT!
-
+import api from '../api/axios';
 
 function Login() {
+  const { login, register, mensaje, setMensaje } = useAuth();
+  const navigate = useNavigate();
+
+  // Estados del formulario
+  const [mostrarLogin, setMostrarLogin] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [mensajeLocal, setMensajeLocal] = useState('');
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Estados de login
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
+
+  // Estados de registro
   const [nombreRegistro, setNombreRegistro] = useState('');
   const [correoRegistro, setCorreoRegistro] = useState('');
   const [contrasenaRegistro, setContrasenaRegistro] = useState('');
-  const [mensajeLocal, setMensajeLocal] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+
+  // Estados del modal de verificación
   const [mostrarVerificacion, setMostrarVerificacion] = useState(false);
   const [emailNoVerificado, setEmailNoVerificado] = useState('');
   const [enviandoVerificacion, setEnviandoVerificacion] = useState(false);
-  const navigate = useNavigate();
-  const { login } = useAuth();
+
+  // Detectar tamaño de pantalla
+  // Detectar tamaño de pantalla
+  useEffect(() => {
+    const checkMobile = () => {
+      const newIsMobile = window.innerWidth <= 768;
+      if (newIsMobile !== isMobile) {
+        setIsMobile(newIsMobile);
+      }
+    };
+
+    // Verificar al cargar
+    checkMobile();
+
+    // Agregar listener con throttling para mejor rendimiento
+    let timeoutId;
+    const throttledResize = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(checkMobile, 100);
+    };
+
+    window.addEventListener('resize', throttledResize);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', throttledResize);
+      clearTimeout(timeoutId);
+    };
+  }, [isMobile]); // ← IMPORTANTE: Agregar isMobile como dependencia
+
+  // Limpiar mensajes
+  useEffect(() => {
+    if (mensaje) {
+      setMensajeLocal(mensaje);
+      const timer = setTimeout(() => {
+        setMensaje('');
+        setMensajeLocal('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [mensaje, setMensaje]);
+
+  const isSuccessMessage = (msg) => {
+    return msg.includes('exitoso') || msg.includes('registrado') || msg.includes('verificado') || msg.includes('✅');
+  };
 
   const handleLogin = async () => {
-    setMensajeLocal('');
-
     if (!correo || !contrasena) {
-      setMensajeLocal('Por favor ingresa ambos campos');
+      setMensajeLocal('⚠️ Por favor complete todos los campos');
       return;
     }
 
     setIsLoading(true);
-    const result = await login(correo, contrasena);
+    setMensajeLocal('');
 
-    if (result.success) {
-      setMensajeLocal(result.message);
-      setTimeout(() => navigate('/productos'), 1000);
-    } else {
-      // Verificar si el error es por email no verificado
-      if (result.requiresVerification) {
-        setMensajeLocal('');
+    try {
+      const success = await login(correo, contrasena);
+      if (success) {
+        navigate('/productos');
+      }
+    } catch (error) {
+      console.error('Error en login:', error);
+
+      if (error.response?.data?.noVerificado) {
         setEmailNoVerificado(correo);
         setMostrarVerificacion(true);
       } else {
-        setMensajeLocal(result.message);
+        setMensajeLocal(error.response?.data?.mensaje || '❌ Error al iniciar sesión');
       }
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const handleRegister = async () => {
-    setMensajeLocal('');
-
     if (!nombreRegistro || !correoRegistro || !contrasenaRegistro) {
-      setMensajeLocal('Por favor completa todos los campos para registrarte.');
+      setMensajeLocal('⚠️ Por favor complete todos los campos');
+      return;
+    }
+
+    if (contrasenaRegistro.length < 6) {
+      setMensajeLocal('⚠️ La contraseña debe tener al menos 6 caracteres');
       return;
     }
 
     setIsLoading(true);
+    setMensajeLocal('');
+
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ nombre: nombreRegistro, correo: correoRegistro, contraseña: contrasenaRegistro })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setMensajeLocal('Registro exitoso. ¡Ahora puedes iniciar sesión!');
-        setNombreRegistro('');
-        setCorreoRegistro('');
-        setContrasenaRegistro('');
-        setTimeout(() => setIsRegistering(false), 2000);
+      const res = await register(nombreRegistro, correoRegistro, contrasenaRegistro);
+      if (res?.success) {
+        setMensajeLocal('✅ Registro exitoso. Revisa tu correo para verificar tu cuenta.');
       } else {
-        setMensajeLocal(data.mensaje || 'Error al registrar usuario.');
+        setMensajeLocal(res?.message || '❌ Error al registrarse');
+        return; // no limpies el formulario si falló
       }
-    } catch (error) {
-      console.error('Error al registrar:', error);
-      setMensajeLocal('No se pudo conectar al servidor para registrar.');
-    }
-    setIsLoading(false);
-  };
+      // Limpiar formulario
+      setNombreRegistro('');
+      setCorreoRegistro('');
+      setContrasenaRegistro('');
 
-  const isSuccessMessage = (message) => {
-    if (!message) return false;
-    const lowerCaseMessage = message.toLowerCase().trim();
-    return lowerCaseMessage.includes('exitoso') || lowerCaseMessage.includes('éxito');
+      // Cambiar a login después de 3 segundos
+      setTimeout(() => {
+        setMostrarLogin(true);
+      }, 3000);
+    } catch (error) {
+      console.error('Error en registro:', error);
+      setMensajeLocal(error.response?.data?.mensaje || '❌ Error al registrar usuario');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleReenviarVerificacion = async () => {
     setEnviandoVerificacion(true);
-    setMensajeLocal('');
-
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/reenviar-verificacion`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ correo: emailNoVerificado })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setMensajeLocal('✅ Email de verificación enviado. Revisa tu bandeja de entrada.');
-        setMostrarVerificacion(false);
-      } else {
-        setMensajeLocal(data.mensaje || 'Error al reenviar verificación.');
-      }
+      const response = await api.post('/auth/reenviar-verificacion', { email: emailNoVerificado });
+      setMensajeLocal('✅ Email de verificación enviado. Revisa tu bandeja de entrada.');
+      setMostrarVerificacion(false);
     } catch (error) {
-      console.error('Error reenviando verificación:', error);
-      setMensajeLocal('No se pudo reenviar el email de verificación.');
+      setMensajeLocal('❌ Error al enviar email de verificación. Inténtalo más tarde.');
     } finally {
       setEnviandoVerificacion(false);
     }
   };
 
-  return (
-    <div style={containerStyle}>
-      {/* Fondo con overlay */}
-      <div style={backgroundStyle}>
-        <img src={fondoArtMary} alt="Art Mary Background" style={backgroundImageStyle} />
-        <div style={overlayStyle}></div>
-      </div>
+  const handleKeyPress = (e, action) => {
+    if (e.key === 'Enter' && !isLoading) {
+      if (action === 'login') {
+        handleLogin();
+      } else if (action === 'register') {
+        handleRegister();
+      }
+    }
+  };
 
-      {/* Contenido principal */}
-      <div style={contentStyle}>
-        {/* Logo y bienvenida */}
-        <div style={logoSectionStyle}>
-          <div style={logoContainerStyle}>
-            <div style={logoStyle}>
-              <img src={logo} alt="Art Mary Logo" style={logoImageStyle} />
+  return (
+    <div
+      style={isMobile ? mobileContainerStyle : containerStyle}
+      className={isMobile ? 'mobile-container' : 'desktop-container'}
+    >
+      <div style={isMobile ? mobileContentStyle : contentStyle}>
+        {/* Sección del logo - responsiva */}
+        <div style={isMobile ? mobileLogoSectionStyle : logoSectionStyle}>
+          <div style={isMobile ? mobileLogoBrandStyle : logoBrandStyle}>
+            <div style={isMobile ? mobileLogoContainerStyle : logoContainerStyle}>
+              <img src={logo} alt="Art Mary Logo" style={isMobile ? mobileLogoStyle : logoStyle} />
+              <div style={isMobile ? mobileLogoGlowStyle : logoGlowStyle}></div>
+            </div>
+            <div style={isMobile ? mobileBrandTextStyle : brandTextStyle}>
+              <h1 style={isMobile ? mobileBrandNameStyle : brandNameStyle}>Art Mary</h1>
+              <p style={isMobile ? mobileBrandTaglineStyle : brandTaglineStyle}>
+                Tu librería y papelería de confianza • Calidad, creatividad y pasión en cada producto
+              </p>
             </div>
           </div>
-          <h1 style={welcomeTitleStyle}>
-            {isRegistering ? 'Únete a Art Mary' : 'Bienvenido a Art Mary'}
-          </h1>
-          <p style={welcomeSubtitleStyle}>
-            {isRegistering
-              ? 'Crea tu cuenta y descubre un mundo de creatividad'
-              : 'Tu librería y papelería de confianza te espera'
-            }
-          </p>
         </div>
 
-        {/* Formulario */}
-        <div style={formContainerStyle}>
-          <div style={formCardStyle}>
-            {/* Tabs */}
-            <div style={tabsContainerStyle}>
-              <button
-                onClick={() => setIsRegistering(false)}
-                style={{
-                  ...tabButtonStyle,
-                  ...(isRegistering ? inactiveTabStyle : activeTabStyle)
-                }}
-              >
-                <span style={tabIconStyle}>🔑</span>
-                Iniciar Sesión
-              </button>
-              <button
-                onClick={() => setIsRegistering(true)}
-                style={{
-                  ...tabButtonStyle,
-                  ...(isRegistering ? activeTabStyle : inactiveTabStyle)
-                }}
-              >
-                <span style={tabIconStyle}>✨</span>
-                Registrarse
-              </button>
-            </div>
-
-            {/* Formulario de Login */}
-            {!isRegistering ? (
-              <div style={formContentStyle}>
-                <div style={inputGroupStyle}>
-                  <label style={labelStyle}>
-                    <span style={labelIconStyle}>📧</span>
-                    Correo electrónico
-                  </label>
-                  <input
-                    type="email"
-                    value={correo}
-                    onChange={(e) => setCorreo(e.target.value)}
-                    style={inputStyle}
-                    placeholder="tu@correo.com"
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div style={inputGroupStyle}>
-                  <label style={labelStyle}>
-                    <span style={labelIconStyle}>🔒</span>
-                    Contraseña
-                  </label>
-                  <input
-                    type="password"
-                    value={contrasena}
-                    onChange={(e) => setContrasena(e.target.value)}
-                    style={inputStyle}
-                    placeholder="Tu contraseña"
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div style={forgotPasswordContainerStyle}>
-                  <Link to="/solicitar-restablecimiento" style={forgotPasswordLinkStyle}>
-                    <span style={forgotPasswordIconStyle}>🔐</span>
-                    ¿Olvidaste tu contraseña?
-                  </Link>
-                </div>
-                <button
-                  onClick={handleLogin}
-                  disabled={isLoading}
-                  style={{
-                    ...primaryButtonStyle,
-                    ...(isLoading ? loadingButtonStyle : {})
-                  }}
-                >
-                  {isLoading ? (
-                    <>
-                      <div style={spinnerStyle}></div>
-                      Iniciando...
-                    </>
-                  ) : (
-                    <>
-                      <span style={buttonIconStyle}>🚀</span>
-                      Ingresar
-                    </>
-                  )}
-                </button>
-              </div>
-            ) : (
-              /* Formulario de Registro */
-              <div style={formContentStyle}>
-                <div style={inputGroupStyle}>
-                  <label style={labelStyle}>
-                    <span style={labelIconStyle}>👤</span>
-                    Nombre completo
-                  </label>
-                  <input
-                    type="text"
-                    value={nombreRegistro}
-                    onChange={(e) => setNombreRegistro(e.target.value)}
-                    style={inputStyle}
-                    placeholder="Tu nombre completo"
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div style={inputGroupStyle}>
-                  <label style={labelStyle}>
-                    <span style={labelIconStyle}>📧</span>
-                    Correo electrónico
-                  </label>
-                  <input
-                    type="email"
-                    value={correoRegistro}
-                    onChange={(e) => setCorreoRegistro(e.target.value)}
-                    style={inputStyle}
-                    placeholder="tu@correo.com"
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div style={inputGroupStyle}>
-                  <label style={labelStyle}>
-                    <span style={labelIconStyle}>🔒</span>
-                    Contraseña
-                  </label>
-                  <input
-                    type="password"
-                    value={contrasenaRegistro}
-                    onChange={(e) => setContrasenaRegistro(e.target.value)}
-                    style={inputStyle}
-                    placeholder="Mínimo 6 caracteres"
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <button
-                  onClick={handleRegister}
-                  disabled={isLoading}
-                  style={{
-                    ...primaryButtonStyle,
-                    ...(isLoading ? loadingButtonStyle : {})
-                  }}
-                >
-                  {isLoading ? (
-                    <>
-                      <div style={spinnerStyle}></div>
-                      Registrando...
-                    </>
-                  ) : (
-                    <>
-                      <span style={buttonIconStyle}>✨</span>
-                      Crear Cuenta
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* Mensaje */}
-            {mensajeLocal && (
-              <div style={{
-                ...messageStyle,
-                ...(isSuccessMessage(mensajeLocal) ? successMessageStyle : errorMessageStyle)
-              }}>
-                <span style={messageIconStyle}>
-                  {isSuccessMessage(mensajeLocal) ? '✅' : '❌'}
-                </span>
-                {mensajeLocal}
-              </div>
-            )}
+        {/* Formulario - responsivo */}
+        <div style={isMobile ? mobileFormCardStyle : formCardStyle}>
+          {/* Encabezado del formulario */}
+          <div style={isMobile ? mobileFormHeaderStyle : formHeaderStyle}>
+            <h2 style={isMobile ? mobileFormTitleStyle : formTitleStyle}>
+              {mostrarLogin ? '¡Bienvenido de nuevo!' : '¡Únete a nosotros!'}
+            </h2>
+            <p style={isMobile ? mobileFormSubtitleStyle : formSubtitleStyle}>
+              {mostrarLogin
+                ? 'Inicia sesión para explorar nuestro catálogo'
+                : 'Crea tu cuenta y descubre productos increíbles'
+              }
+            </p>
           </div>
 
-          {/* Decoraciones */}
+          {/* Botones de cambio */}
+          <div style={isMobile ? mobileToggleContainerStyle : toggleContainerStyle}>
+            <button
+              onClick={() => setMostrarLogin(true)}
+              style={{
+                ...(isMobile ? mobileToggleButtonStyle : toggleButtonStyle),
+                ...(mostrarLogin ? (isMobile ? mobileActiveToggleStyle : activeToggleStyle) : {})
+              }}
+              disabled={isLoading}
+            >
+              <span style={toggleIconStyle}>🔑</span>
+              Iniciar Sesión
+            </button>
+            <button
+              onClick={() => setMostrarLogin(false)}
+              style={{
+                ...(isMobile ? mobileToggleButtonStyle : toggleButtonStyle),
+                ...(!mostrarLogin ? (isMobile ? mobileActiveToggleStyle : activeToggleStyle) : {})
+              }}
+              disabled={isLoading}
+            >
+              <span style={toggleIconStyle}>✨</span>
+              Registrarse
+            </button>
+          </div>
+
+          {mostrarLogin ? (
+            /* Formulario de Login */
+            <div style={isMobile ? mobileFormContentStyle : formContentStyle}>
+              <div style={isMobile ? mobileInputGroupStyle : inputGroupStyle}>
+                <label style={isMobile ? mobileLabelStyle : labelStyle}>
+                  <span style={labelIconStyle}>📧</span>
+                  Correo electrónico
+                </label>
+                <input
+                  type="email"
+                  value={correo}
+                  onChange={(e) => setCorreo(e.target.value)}
+                  onKeyPress={(e) => handleKeyPress(e, 'login')}
+                  style={isMobile ? mobileInputStyle : inputStyle}
+                  placeholder="tu@correo.com"
+                  disabled={isLoading}
+                  className="login-input"
+                />
+              </div>
+
+              <div style={isMobile ? mobileInputGroupStyle : inputGroupStyle}>
+                <label style={isMobile ? mobileLabelStyle : labelStyle}>
+                  <span style={labelIconStyle}>🔒</span>
+                  Contraseña
+                </label>
+                <input
+                  type="password"
+                  value={contrasena}
+                  onChange={(e) => setContrasena(e.target.value)}
+                  onKeyPress={(e) => handleKeyPress(e, 'login')}
+                  style={isMobile ? mobileInputStyle : inputStyle}
+                  placeholder="Tu contraseña"
+                  disabled={isLoading}
+                  className="login-input"
+                />
+              </div>
+
+              <div style={isMobile ? mobileForgotPasswordStyle : forgotPasswordStyle}>
+                <Link
+                  to="/solicitar-restablecimiento"
+                  style={isMobile ? mobileForgotLinkStyle : forgotLinkStyle}
+                  className="forgot-password-link"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
+
+              <button
+                onClick={handleLogin}
+                disabled={isLoading}
+                style={{
+                  ...(isMobile ? mobilePrimaryButtonStyle : primaryButtonStyle),
+                  ...(isLoading ? loadingButtonStyle : {})
+                }}
+                className="login-button"
+              >
+                {isLoading ? (
+                  <>
+                    <div style={spinnerStyle}></div>
+                    Iniciando...
+                  </>
+                ) : (
+                  <>
+                    <span style={buttonIconStyle}>🚀</span>
+                    Ingresar
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            /* Formulario de Registro */
+            <div style={isMobile ? mobileFormContentStyle : formContentStyle}>
+              <div style={isMobile ? mobileInputGroupStyle : inputGroupStyle}>
+                <label style={isMobile ? mobileLabelStyle : labelStyle}>
+                  <span style={labelIconStyle}>👤</span>
+                  Nombre completo
+                </label>
+                <input
+                  type="text"
+                  value={nombreRegistro}
+                  onChange={(e) => setNombreRegistro(e.target.value)}
+                  onKeyPress={(e) => handleKeyPress(e, 'register')}
+                  style={isMobile ? mobileInputStyle : inputStyle}
+                  placeholder="Tu nombre completo"
+                  disabled={isLoading}
+                  className="login-input"
+                />
+              </div>
+
+              <div style={isMobile ? mobileInputGroupStyle : inputGroupStyle}>
+                <label style={isMobile ? mobileLabelStyle : labelStyle}>
+                  <span style={labelIconStyle}>📧</span>
+                  Correo electrónico
+                </label>
+                <input
+                  type="email"
+                  value={correoRegistro}
+                  onChange={(e) => setCorreoRegistro(e.target.value)}
+                  onKeyPress={(e) => handleKeyPress(e, 'register')}
+                  style={isMobile ? mobileInputStyle : inputStyle}
+                  placeholder="tu@correo.com"
+                  disabled={isLoading}
+                  className="login-input"
+                />
+              </div>
+
+              <div style={isMobile ? mobileInputGroupStyle : inputGroupStyle}>
+                <label style={isMobile ? mobileLabelStyle : labelStyle}>
+                  <span style={labelIconStyle}>🔑</span>
+                  Contraseña
+                </label>
+                <input
+                  type="password"
+                  value={contrasenaRegistro}
+                  onChange={(e) => setContrasenaRegistro(e.target.value)}
+                  onKeyPress={(e) => handleKeyPress(e, 'register')}
+                  style={isMobile ? mobileInputStyle : inputStyle}
+                  placeholder="Mínimo 6 caracteres"
+                  disabled={isLoading}
+                  className="login-input"
+                />
+              </div>
+
+              <button
+                onClick={handleRegister}
+                disabled={isLoading}
+                style={{
+                  ...(isMobile ? mobilePrimaryButtonStyle : primaryButtonStyle),
+                  ...(isLoading ? loadingButtonStyle : {})
+                }}
+                className="login-button"
+              >
+                {isLoading ? (
+                  <>
+                    <div style={spinnerStyle}></div>
+                    Registrando...
+                  </>
+                ) : (
+                  <>
+                    <span style={buttonIconStyle}>✨</span>
+                    Crear Cuenta
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Mensaje */}
+          {mensajeLocal && (
+            <div style={{
+              ...(isMobile ? mobileMessageStyle : messageStyle),
+              ...(isSuccessMessage(mensajeLocal) ? successMessageStyle : errorMessageStyle)
+            }}>
+              <span style={messageIconStyle}>
+                {isSuccessMessage(mensajeLocal) ? '✅' : '❌'}
+              </span>
+              {mensajeLocal}
+            </div>
+          )}
+        </div>
+
+        {/* Decoraciones - solo desktop */}
+        {!isMobile && (
           <div style={decorationsStyle}>
             <div style={floatingElementStyle}>💕</div>
             <div style={{ ...floatingElementStyle, ...floatingElement2Style }}>🌸</div>
             <div style={{ ...floatingElementStyle, ...floatingElement3Style }}>✨</div>
           </div>
-        </div>
+        )}
       </div>
-      {/* Modal de verificación de email */}
+
+      {/* Modal de verificación */}
       {mostrarVerificacion && (
         <div style={modalOverlayStyle} onClick={() => setMostrarVerificacion(false)}>
-          <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+          <div style={isMobile ? mobileModalContentStyle : modalContentStyle} onClick={(e) => e.stopPropagation()}>
             <div style={modalHeaderStyle}>
               <span style={modalIconStyle}>📧</span>
               <h3 style={modalTitleStyle}>Verificación Requerida</h3>
@@ -346,10 +417,10 @@ function Login() {
                 Si no has recibido el email de verificación, puedes solicitar que te enviemos uno nuevo.
               </p>
             </div>
-            <div style={modalActionsStyle}>
+            <div style={isMobile ? mobileModalActionsStyle : modalActionsStyle}>
               <button
                 onClick={() => setMostrarVerificacion(false)}
-                style={modalCancelButtonStyle}
+                style={isMobile ? mobileModalCancelButtonStyle : modalCancelButtonStyle}
                 disabled={enviandoVerificacion}
               >
                 Cancelar
@@ -358,19 +429,19 @@ function Login() {
                 onClick={handleReenviarVerificacion}
                 disabled={enviandoVerificacion}
                 style={{
-                  ...modalConfirmButtonStyle,
+                  ...(isMobile ? mobileModalConfirmButtonStyle : modalConfirmButtonStyle),
                   opacity: enviandoVerificacion ? 0.7 : 1
                 }}
               >
                 {enviandoVerificacion ? (
                   <>
-                    <div style={miniSpinnerStyle}></div>
+                    <div style={smallSpinnerStyle}></div>
                     Enviando...
                   </>
                 ) : (
                   <>
-                    <span style={buttonIconStyle}>📧</span>
-                    Reenviar Verificación
+                    <span>📧</span>
+                    Reenviar Email
                   </>
                 )}
               </button>
@@ -382,149 +453,301 @@ function Login() {
   );
 }
 
-// Estilos
+// ESTILOS DESKTOP
 const containerStyle = {
   minHeight: '100vh',
-  position: 'relative',
-  overflow: 'hidden',
-  fontFamily: 'var(--font-sans)'
-};
-
-const backgroundStyle = {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  width: '100%',
-  height: '100%',
-  zIndex: 1
-};
-
-const backgroundImageStyle = {
-  width: '100%',
-  height: '100%',
-  objectFit: 'cover',
-  filter: 'blur(8px) brightness(0.7)'
-};
-
-const overlayStyle = {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  width: '100%',
-  height: '100%',
-  background: 'var(--gradient-primary)',
-  opacity: 0.8
+  background: 'linear-gradient(135deg, #fdf2f8 0%, #fef3c7 25%, #fce7f3 50%, #e0e7ff 75%, #f3f4f6 100%)',
+  padding: '2rem',
+  paddingTop: '120px', // ← AGREGA ESTA LÍNEA
+  fontFamily: 'Inter, system-ui, sans-serif',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
 };
 
 const contentStyle = {
-  position: 'relative',
-  zIndex: 2,
-  minHeight: '100vh',
   display: 'flex',
+  gap: '4rem',
   alignItems: 'center',
-  justifyContent: 'center',
-  padding: '2rem',
-  gap: '4rem'
+  maxWidth: '1200px',
+  width: '100%'
 };
 
 const logoSectionStyle = {
-  textAlign: 'center',
-  color: 'white',
-  maxWidth: '400px'
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  textAlign: 'center'
+};
+
+const logoBrandStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '2rem'
 };
 
 const logoContainerStyle = {
+  position: 'relative',
   display: 'flex',
-  justifyContent: 'center',
-  marginBottom: '2rem'
+  alignItems: 'center',
+  justifyContent: 'center'
 };
 
 const logoStyle = {
-  width: '100px',
-  height: '100px',
-  borderRadius: '50%',
-  background: 'rgba(255, 255, 255, 0.2)',
-  backdropFilter: 'blur(20px)',
-  border: '2px solid rgba(255, 255, 255, 0.3)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-  animation: 'float 3s ease-in-out infinite'
-};
-
-const logoImageStyle = {
-  width: '70px',
-  height: '70px',
+  height: '120px',
+  width: '120px',
   objectFit: 'contain',
-  borderRadius: '10px'
+  borderRadius: '50%',
+  transition: 'transform 0.3s ease',
+  position: 'relative',
+  zIndex: 2,
+  boxShadow: '0 20px 40px rgba(236, 72, 153, 0.3)'
 };
 
-const welcomeTitleStyle = {
-  fontSize: 'clamp(2rem, 4vw, 3rem)',
+const logoGlowStyle = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: '150px',
+  height: '150px',
+  background: 'radial-gradient(circle, rgba(236, 72, 153, 0.3) 0%, transparent 70%)',
+  borderRadius: '50%',
+  zIndex: 1,
+  animation: 'pulse 3s ease-in-out infinite'
+};
+
+const brandTextStyle = {
+  maxWidth: '500px'
+};
+
+const brandNameStyle = {
+  fontSize: '3.5rem',
   fontWeight: '800',
-  marginBottom: '1rem',
-  fontFamily: 'var(--font-display)',
-  textShadow: '2px 2px 4px rgba(0, 0, 0, 0.3)'
+  background: 'linear-gradient(135deg, #ec4899, #f472b6, #a855f7)',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text',
+  margin: '0 0 1rem 0',
+  lineHeight: 1.2,
+  animation: 'rainbow 3s ease-in-out infinite'
 };
 
-const welcomeSubtitleStyle = {
-  fontSize: '1.125rem',
-  opacity: 0.9,
+const brandTaglineStyle = {
+  fontSize: '1.25rem',
+  color: '#6b7280',
+  fontWeight: '500',
   lineHeight: 1.6,
-  textShadow: '1px 1px 2px rgba(0, 0, 0, 0.3)'
-};
-
-const formContainerStyle = {
-  position: 'relative'
+  margin: 0
 };
 
 const formCardStyle = {
+  flex: 1,
   background: 'rgba(255, 255, 255, 0.95)',
   backdropFilter: 'blur(20px)',
-  borderRadius: 'var(--border-radius-2xl)',
-  padding: '2.5rem',
-  boxShadow: '0 25px 50px rgba(0, 0, 0, 0.2)',
+  borderRadius: '2rem',
+  padding: '3rem',
+  boxShadow: '0 25px 50px rgba(0, 0, 0, 0.15)',
   border: '1px solid rgba(255, 255, 255, 0.3)',
-  minWidth: '400px',
-  animation: 'slideIn 0.6s ease-out'
+  minWidth: '450px',
+  maxWidth: '500px',
+  animation: 'slideIn 0.8s ease-out'
 };
 
-const tabsContainerStyle = {
+// ESTILOS MÓVIL
+const mobileContainerStyle = {
+  minHeight: '100vh',
+  background: 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 50%, #e0e7ff 100%)',
+  padding: '1rem',
+  paddingTop: '100px', // ← AGREGA ESTA LÍNEA
+  fontFamily: 'Inter, system-ui, sans-serif'
+};
+
+const mobileContentStyle = {
   display: 'flex',
-  marginBottom: '2rem',
-  background: 'var(--neutral-100)',
-  borderRadius: 'var(--border-radius-xl)',
-  padding: '0.25rem'
+  flexDirection: 'column',
+  gap: '2rem',
+  minHeight: 'calc(100vh - 2rem)'
 };
 
-const tabButtonStyle = {
+const mobileLogoSectionStyle = {
+  textAlign: 'center',
+  paddingTop: '2rem'
+};
+
+const mobileLogoBrandStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '1rem'
+};
+
+const mobileLogoContainerStyle = {
+  position: 'relative',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+};
+
+const mobileLogoStyle = {
+  height: '80px',
+  width: '80px',
+  objectFit: 'contain',
+  borderRadius: '50%',
+  boxShadow: '0 15px 30px rgba(236, 72, 153, 0.3)'
+};
+
+const mobileLogoGlowStyle = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: '100px',
+  height: '100px',
+  background: 'radial-gradient(circle, rgba(236, 72, 153, 0.2) 0%, transparent 70%)',
+  borderRadius: '50%',
+  zIndex: 1
+};
+
+const mobileBrandTextStyle = {
+  maxWidth: '100%'
+};
+
+const mobileBrandNameStyle = {
+  fontSize: '2.5rem',
+  fontWeight: '800',
+  color: '#ec4899', // Color sólido directo
+  margin: '0 0 0.5rem 0',
+  lineHeight: 1.2,
+  textShadow: '0 2px 4px rgba(236, 72, 153, 0.3)' // Sombra para darle más estilo
+};
+
+const mobileBrandTaglineStyle = {
+  fontSize: '1rem',
+  color: '#6b7280',
+  fontWeight: '500',
+  lineHeight: 1.5,
+  margin: 0,
+  padding: '0 1rem'
+};
+
+const mobileFormCardStyle = {
   flex: 1,
+  background: 'rgba(255, 255, 255, 0.95)',
+  backdropFilter: 'blur(20px)',
+  borderRadius: '1.5rem',
+  padding: '2rem 1.5rem',
+  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+  border: '1px solid rgba(255, 255, 255, 0.3)',
+  margin: '0 auto',
+  width: '100%',
+  maxWidth: '400px'
+};
+
+// ESTILOS COMUNES ADAPTADOS
+const formHeaderStyle = {
+  textAlign: 'center',
+  marginBottom: '2rem'
+};
+
+const mobileFormHeaderStyle = {
+  textAlign: 'center',
+  marginBottom: '1.5rem'
+};
+
+const formTitleStyle = {
+  fontSize: '2rem',
+  fontWeight: '700',
+  color: '#1f2937',
+  margin: '0 0 0.5rem 0'
+};
+
+const mobileFormTitleStyle = {
+  fontSize: '1.5rem',
+  fontWeight: '700',
+  color: '#1f2937',
+  margin: '0 0 0.5rem 0'
+};
+
+const formSubtitleStyle = {
+  fontSize: '1rem',
+  color: '#6b7280',
+  margin: 0
+};
+
+const mobileFormSubtitleStyle = {
+  fontSize: '0.9rem',
+  color: '#6b7280',
+  margin: 0
+};
+
+const toggleContainerStyle = {
+  display: 'flex',
+  background: '#f3f4f6',
+  borderRadius: '1rem',
+  padding: '0.5rem',
+  marginBottom: '2rem',
+  gap: '0.5rem'
+};
+
+const mobileToggleContainerStyle = {
+  display: 'flex',
+  background: '#f3f4f6',
+  borderRadius: '0.75rem',
+  padding: '0.25rem',
+  marginBottom: '1.5rem',
+  gap: '0.25rem'
+};
+
+const toggleButtonStyle = {
+  flex: 1,
+  padding: '0.75rem 1rem',
+  background: 'transparent',
+  border: 'none',
+  borderRadius: '0.75rem',
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  color: '#6b7280',
+  cursor: 'pointer',
+  transition: 'all 0.3s ease',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: '0.5rem',
-  padding: '0.75rem 1rem',
-  border: 'none',
-  borderRadius: 'var(--border-radius-lg)',
-  fontSize: '0.875rem',
-  fontWeight: '600',
-  cursor: 'pointer',
-  transition: 'all 0.3s ease'
+  gap: '0.5rem'
 };
 
-const activeTabStyle = {
-  background: 'var(--gradient-primary)',
-  color: 'white',
-  boxShadow: '0 4px 12px rgba(236, 72, 153, 0.3)'
-};
-
-const inactiveTabStyle = {
+const mobileToggleButtonStyle = {
+  flex: 1,
+  padding: '0.6rem 0.75rem',
   background: 'transparent',
-  color: 'var(--neutral-600)'
+  border: 'none',
+  borderRadius: '0.5rem',
+  fontSize: '0.8rem',
+  fontWeight: '600',
+  color: '#6b7280',
+  cursor: 'pointer',
+  transition: 'all 0.3s ease',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '0.4rem'
 };
 
-const tabIconStyle = {
+const activeToggleStyle = {
+  background: 'white',
+  color: '#ec4899',
+  boxShadow: '0 4px 12px rgba(236, 72, 153, 0.2)'
+};
+
+const mobileActiveToggleStyle = {
+  background: 'white',
+  color: '#ec4899',
+  boxShadow: '0 2px 8px rgba(236, 72, 153, 0.2)'
+};
+
+const toggleIconStyle = {
   fontSize: '1rem'
 };
 
@@ -534,19 +757,40 @@ const formContentStyle = {
   gap: '1.5rem'
 };
 
+const mobileFormContentStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem'
+};
+
 const inputGroupStyle = {
   display: 'flex',
   flexDirection: 'column',
   gap: '0.5rem'
 };
 
-const labelStyle = {
+const mobileInputGroupStyle = {
   display: 'flex',
-  alignItems: 'center',
-  gap: '0.5rem',
+  flexDirection: 'column',
+  gap: '0.4rem'
+};
+
+const labelStyle = {
   fontSize: '0.875rem',
   fontWeight: '600',
-  color: 'var(--neutral-700)'
+  color: '#374151',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem'
+};
+
+const mobileLabelStyle = {
+  fontSize: '0.8rem',
+  fontWeight: '600',
+  color: '#374151',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.4rem'
 };
 
 const labelIconStyle = {
@@ -554,15 +798,45 @@ const labelIconStyle = {
 };
 
 const inputStyle = {
-  padding: '1rem 1.25rem',
-  borderRadius: 'var(--border-radius-xl)',
-  border: '1px solid var(--neutral-300)',
-  background: 'white',
-  color: 'var(--neutral-800)',
+  padding: '1rem',
+  border: '2px solid #e5e7eb',
+  borderRadius: '0.75rem',
   fontSize: '1rem',
   transition: 'all 0.3s ease',
-  outline: 'none',
-  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+  background: 'white'
+};
+
+const mobileInputStyle = {
+  padding: '0.8rem',
+  border: '2px solid #e5e7eb',
+  borderRadius: '0.6rem',
+  fontSize: '0.9rem',
+  transition: 'all 0.3s ease',
+  background: 'white'
+};
+
+const forgotPasswordStyle = {
+  textAlign: 'right'
+};
+
+const mobileForgotPasswordStyle = {
+  textAlign: 'center'
+};
+
+const forgotLinkStyle = {
+  fontSize: '0.875rem',
+  color: '#ec4899',
+  textDecoration: 'none',
+  fontWeight: '500',
+  transition: 'all 0.3s ease'
+};
+
+const mobileForgotLinkStyle = {
+  fontSize: '0.8rem',
+  color: '#ec4899',
+  textDecoration: 'none',
+  fontWeight: '500',
+  transition: 'all 0.3s ease'
 };
 
 const primaryButtonStyle = {
@@ -570,26 +844,46 @@ const primaryButtonStyle = {
   alignItems: 'center',
   justifyContent: 'center',
   gap: '0.75rem',
-  padding: '1rem 1.5rem',
-  background: 'var(--gradient-primary)',
+  width: '100%',
+  padding: '1rem 2rem',
+  background: 'linear-gradient(135deg, #ec4899, #f472b6)',
   color: 'white',
   border: 'none',
-  borderRadius: 'var(--border-radius-xl)',
+  borderRadius: '0.75rem',
   fontSize: '1rem',
   fontWeight: '700',
   cursor: 'pointer',
   transition: 'all 0.3s ease',
   boxShadow: '0 8px 20px rgba(236, 72, 153, 0.4)',
-  marginTop: '0.5rem'
+  marginTop: '1rem'
+};
+
+const mobilePrimaryButtonStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '0.6rem',
+  width: '100%',
+  padding: '0.9rem 1.5rem',
+  background: 'linear-gradient(135deg, #ec4899, #f472b6)',
+  color: 'white',
+  border: 'none',
+  borderRadius: '0.6rem',
+  fontSize: '0.9rem',
+  fontWeight: '700',
+  cursor: 'pointer',
+  transition: 'all 0.3s ease',
+  boxShadow: '0 6px 16px rgba(236, 72, 153, 0.4)',
+  marginTop: '1rem'
 };
 
 const loadingButtonStyle = {
-  opacity: 0.8,
+  opacity: 0.7,
   cursor: 'not-allowed'
 };
 
 const buttonIconStyle = {
-  fontSize: '1.25rem'
+  fontSize: '1.1rem'
 };
 
 const spinnerStyle = {
@@ -601,63 +895,235 @@ const spinnerStyle = {
   animation: 'spin 1s linear infinite'
 };
 
+const smallSpinnerStyle = {
+  width: '16px',
+  height: '16px',
+  border: '2px solid rgba(255, 255, 255, 0.3)',
+  borderTop: '2px solid white',
+  borderRadius: '50%',
+  animation: 'spin 1s linear infinite'
+};
+
 const messageStyle = {
+  padding: '1rem',
+  borderRadius: '0.75rem',
+  fontSize: '0.9rem',
+  fontWeight: '600',
   display: 'flex',
   alignItems: 'center',
   gap: '0.75rem',
-  padding: '1rem',
-  borderRadius: 'var(--border-radius-xl)',
-  fontSize: '0.875rem',
+  marginTop: '1rem',
+  animation: 'slideIn 0.3s ease-out'
+};
+
+const mobileMessageStyle = {
+  padding: '0.8rem',
+  borderRadius: '0.6rem',
+  fontSize: '0.8rem',
   fontWeight: '600',
-  marginTop: '1rem'
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.6rem',
+  marginTop: '1rem',
+  animation: 'slideIn 0.3s ease-out'
 };
 
 const successMessageStyle = {
-  background: 'linear-gradient(135deg, #10b981, #059669)',
-  color: 'white',
-  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+  background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
+  color: '#166534',
+  border: '1px solid #22c55e'
 };
 
 const errorMessageStyle = {
-  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-  color: 'white',
-  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+  background: 'linear-gradient(135deg, #fef2f2, #fecaca)',
+  color: '#dc2626',
+  border: '1px solid #ef4444'
 };
 
 const messageIconStyle = {
-  fontSize: '1.25rem'
+  fontSize: '1.2rem'
 };
 
 const decorationsStyle = {
   position: 'absolute',
   top: 0,
   left: 0,
-  width: '100%',
-  height: '100%',
+  right: 0,
+  bottom: 0,
   pointerEvents: 'none',
-  zIndex: -1
+  zIndex: 1
 };
 
 const floatingElementStyle = {
   position: 'absolute',
   fontSize: '2rem',
-  opacity: 0.3,
-  animation: 'float 4s ease-in-out infinite'
+  opacity: 0.1,
+  animation: 'float 6s ease-in-out infinite'
 };
 
 const floatingElement2Style = {
   top: '20%',
   right: '10%',
-  animationDelay: '1s'
+  animationDelay: '2s'
 };
 
 const floatingElement3Style = {
   bottom: '20%',
   left: '10%',
-  animationDelay: '2s'
+  animationDelay: '4s'
 };
 
-// Agregar animaciones CSS
+// ESTILOS DEL MODAL
+const modalOverlayStyle = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  width: '100%',
+  height: '100%',
+  background: 'rgba(0, 0, 0, 0.5)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 1000,
+  backdropFilter: 'blur(5px)',
+  padding: '1rem'
+};
+
+const modalContentStyle = {
+  background: 'white',
+  borderRadius: '1.5rem',
+  padding: '2rem',
+  maxWidth: '450px',
+  width: '90%',
+  boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)',
+  animation: 'slideIn 0.3s ease-out'
+};
+
+const mobileModalContentStyle = {
+  background: 'white',
+  borderRadius: '1.2rem',
+  padding: '1.5rem',
+  maxWidth: '350px',
+  width: '95%',
+  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+  animation: 'slideIn 0.3s ease-out'
+};
+
+const modalHeaderStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '1rem',
+  marginBottom: '1.5rem',
+  paddingBottom: '1rem',
+  borderBottom: '1px solid #e5e7eb'
+};
+
+const modalIconStyle = {
+  fontSize: '2rem'
+};
+
+const modalTitleStyle = {
+  fontSize: '1.5rem',
+  fontWeight: '700',
+  color: '#1f2937',
+  margin: 0
+};
+
+const modalBodyStyle = {
+  marginBottom: '2rem'
+};
+
+const modalTextStyle = {
+  fontSize: '1rem',
+  color: '#6b7280',
+  lineHeight: 1.6,
+  marginBottom: '1rem'
+};
+
+const emailInfoStyle = {
+  background: '#f3f4f6',
+  padding: '1rem',
+  borderRadius: '0.5rem',
+  fontSize: '0.9rem',
+  color: '#374151',
+  marginBottom: '1rem'
+};
+
+const modalSubtextStyle = {
+  fontSize: '0.9rem',
+  color: '#9ca3af',
+  lineHeight: 1.5,
+  margin: 0
+};
+
+const modalActionsStyle = {
+  display: 'flex',
+  gap: '1rem',
+  justifyContent: 'flex-end'
+};
+
+const mobileModalActionsStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.75rem'
+};
+
+const modalCancelButtonStyle = {
+  padding: '0.75rem 1.5rem',
+  background: '#f3f4f6',
+  color: '#374151',
+  border: 'none',
+  borderRadius: '0.5rem',
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  cursor: 'pointer',
+  transition: 'all 0.3s ease'
+};
+
+const mobileModalCancelButtonStyle = {
+  padding: '0.8rem 1rem',
+  background: '#f3f4f6',
+  color: '#374151',
+  border: 'none',
+  borderRadius: '0.5rem',
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  cursor: 'pointer',
+  transition: 'all 0.3s ease'
+};
+
+const modalConfirmButtonStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  padding: '0.75rem 1.5rem',
+  background: 'linear-gradient(135deg, #ec4899, #f472b6)',
+  color: 'white',
+  border: 'none',
+  borderRadius: '0.5rem',
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  cursor: 'pointer',
+  transition: 'all 0.3s ease'
+};
+
+const mobileModalConfirmButtonStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '0.5rem',
+  padding: '0.8rem 1rem',
+  background: 'linear-gradient(135deg, #ec4899, #f472b6)',
+  color: 'white',
+  border: 'none',
+  borderRadius: '0.5rem',
+  fontSize: '0.9rem',
+  fontWeight: '600',
+  cursor: 'pointer',
+  transition: 'all 0.3s ease'
+};
+
+// ANIMACIONES CSS
 const additionalStyles = `
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
@@ -680,9 +1146,26 @@ const additionalStyles = `
   100% { transform: rotate(360deg); }
 }
 
+@keyframes pulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 0.5;
+  }
+}
+
+@keyframes rainbow {
+  0%, 100% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(30deg); }
+}
+
 .login-input:focus {
-  border-color: var(--primary-500) !important;
+  border-color: #ec4899 !important;
   box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.1) !important;
+  outline: none;
 }
 
 .login-button:hover:not(:disabled) {
@@ -690,6 +1173,12 @@ const additionalStyles = `
   box-shadow: 0 12px 25px rgba(236, 72, 153, 0.5) !important;
 }
 
+.forgot-password-link:hover {
+  color: #be185d !important;
+  transform: translateY(-1px);
+}
+
+/* Responsive mejoras adicionales */
 @media (max-width: 768px) {
   .login-content {
     flex-direction: column;
@@ -699,165 +1188,93 @@ const additionalStyles = `
   
   .login-form-card {
     min-width: auto;
-    padding: 2rem;
+    padding: 1.5rem;
   }
   
   .login-logo-section {
     order: -1;
   }
 
-  .forgot-password-link:hover {
-  color: var(--primary-700) !important;
-  transform: translateY(-1px);
+  /* Mejoras de touch para móvil */
+  .login-input {
+    -webkit-appearance: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .login-button {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+}
+
+@media (max-width: 480px) {
+  .mobile-form-card {
+    padding: 1.2rem !important;
+    border-radius: 1rem !important;
+  }
+  
+  .mobile-brand-name {
+    font-size: 2rem !important;
+  }
+  
+  .mobile-form-title {
+    font-size: 1.3rem !important;
+  }
+}
+
+/* Mejoras para pantallas muy pequeñas */
+@media (max-width: 320px) {
+  .mobile-container {
+    padding: 0.5rem !important;
+  }
+  
+  .mobile-form-card {
+    padding: 1rem !important;
+  }
+}
+  /* Forzar re-render en cambios de viewport */
+@media (min-width: 769px) {
+  .mobile-container {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .desktop-container {
+    display: none !important;
+  }
+}
+
+/* Arreglo para texto invisible en móvil */
+@media (max-width: 768px) {
+  .mobile-brand-name {
+    background: linear-gradient(135deg, #ec4899, #f472b6) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    color: #ec4899 !important; /* Fallback */
+  }
+  
+  /* Si el gradiente falla, usar color sólido */
+  @supports not (background-clip: text) {
+    .mobile-brand-name {
+      color: #ec4899 !important;
+      background: none !important;
+      -webkit-text-fill-color: #ec4899 !important;
+    }
   }
 }
 `;
 
 // Inyectar estilos
 if (typeof document !== 'undefined') {
-  const existingStyle = document.getElementById('login-styles');
+  const existingStyle = document.getElementById('login-responsive-styles');
   if (!existingStyle) {
     const styleSheet = document.createElement('style');
-    styleSheet.id = 'login-styles';
+    styleSheet.id = 'login-responsive-styles';
     styleSheet.textContent = additionalStyles;
     document.head.appendChild(styleSheet);
   }
 }
-
-// Estilos del modal
-const modalOverlayStyle = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  width: '100%',
-  height: '100%',
-  background: 'rgba(0, 0, 0, 0.5)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 1000,
-  backdropFilter: 'blur(5px)'
-};
-
-const modalContentStyle = {
-  background: 'white',
-  borderRadius: '1.5rem',
-  padding: '2rem',
-  maxWidth: '450px',
-  width: '90%',
-  boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)',
-  animation: 'slideIn 0.3s ease-out'
-};
-
-const modalHeaderStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '1rem',
-  marginBottom: '1.5rem',
-  paddingBottom: '1rem',
-  borderBottom: '1px solid var(--neutral-200)'
-};
-
-const modalIconStyle = {
-  fontSize: '2rem'
-};
-
-const modalTitleStyle = {
-  fontSize: '1.5rem',
-  fontWeight: '700',
-  color: 'var(--neutral-800)',
-  margin: 0
-};
-
-const modalBodyStyle = {
-  marginBottom: '2rem'
-};
-
-const modalTextStyle = {
-  fontSize: '1rem',
-  color: 'var(--neutral-600)',
-  lineHeight: 1.6,
-  marginBottom: '1rem'
-};
-
-const emailInfoStyle = {
-  padding: '1rem',
-  background: 'var(--primary-50)',
-  borderRadius: '0.75rem',
-  border: '1px solid var(--primary-200)',
-  marginBottom: '1rem',
-  fontSize: '0.875rem',
-  color: 'var(--primary-700)',
-  wordBreak: 'break-all'
-};
-
-const modalSubtextStyle = {
-  fontSize: '0.875rem',
-  color: 'var(--neutral-500)',
-  lineHeight: 1.5
-};
-
-const modalActionsStyle = {
-  display: 'flex',
-  gap: '1rem',
-  justifyContent: 'flex-end'
-};
-
-const modalCancelButtonStyle = {
-  padding: '0.75rem 1.5rem',
-  background: 'transparent',
-  color: 'var(--neutral-600)',
-  border: '1px solid var(--neutral-300)',
-  borderRadius: '0.75rem',
-  fontSize: '0.875rem',
-  fontWeight: '600',
-  cursor: 'pointer',
-  transition: 'all 0.3s ease'
-};
-
-const modalConfirmButtonStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.5rem',
-  padding: '0.75rem 1.5rem',
-  background: 'var(--gradient-primary)',
-  color: 'white',
-  border: 'none',
-  borderRadius: '0.75rem',
-  fontSize: '0.875rem',
-  fontWeight: '600',
-  cursor: 'pointer',
-  transition: 'all 0.3s ease'
-};
-
-const miniSpinnerStyle = {
-  width: '16px',
-  height: '16px',
-  border: '2px solid rgba(255, 255, 255, 0.3)',
-  borderTop: '2px solid white',
-  borderRadius: '50%',
-  animation: 'spin 1s linear infinite'
-};
-
-const forgotPasswordContainerStyle = {
-  textAlign: 'center',
-  marginBottom: '1rem'
-};
-
-const forgotPasswordLinkStyle = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '0.5rem',
-  color: 'var(--primary-600)',
-  textDecoration: 'none',
-  fontSize: '0.875rem',
-  fontWeight: '600',
-  transition: 'all 0.3s ease',
-  padding: '0.5rem'
-};
-
-const forgotPasswordIconStyle = {
-  fontSize: '1rem'
-};
 
 export default Login;
