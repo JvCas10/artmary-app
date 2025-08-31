@@ -40,7 +40,7 @@ exports.obtenerPedidos = async (req, res) => {
 // Función para obtener los pedidos de un usuario específico
 exports.obtenerMisPedidos = async (req, res) => {
   try {
-    const userId = req.user._id; 
+    const userId = req.user._id;
     const pedidos = await Order.find({ userId: userId }).sort({ fecha: -1 });
     res.json(pedidos);
   } catch (error) {
@@ -107,18 +107,58 @@ exports.cancelarPedidoCliente = async (req, res) => {
       return res.status(403).json({ mensaje: 'No tienes permiso para cancelar este pedido.' });
     }
 
-    // Verificar que el pedido no esté ya entregado o cancelado
+    // ✅ VERIFICACIÓN AMPLIADA: Incluir 'listo_para_recoger' y 'enviado'
     if (pedido.estado === 'entregado' || pedido.estado === 'cancelado') {
       return res.status(400).json({ mensaje: `El pedido ya está ${pedido.estado}. No se puede cancelar.` });
     }
 
-    // Devolver stock de los productos del pedido
+    // ✅ DEVOLUCIÓN DE STOCK CORREGIDA con lógica de conjuntos
     for (const item of pedido.productos) {
       const producto = await Product.findById(item.productId);
       if (producto) {
-        producto.stock += item.cantidad; // Devuelve la cantidad al stock
+        let unidadesADevolver;
+
+        // Determinar cuántas unidades devolver según el tipo de venta
+        if (item.tipoVenta === 'conjunto') {
+          // Para conjuntos: item.cantidad contiene la cantidad de conjuntos O las unidades totales
+          // Verificar si tenemos la información completa del conjunto
+          if (item.unidadesPorConjunto && item.cantidadOriginal) {
+            // Caso ideal: tenemos toda la información
+            const cantidadConjuntos = item.cantidadOriginal;
+            const unidadesPorConjunto = item.unidadesPorConjunto;
+            unidadesADevolver = cantidadConjuntos * unidadesPorConjunto;
+
+            console.log(`📦 Devolviendo stock por conjuntos (cliente):
+              - Producto: ${producto.nombre}
+              - Conjuntos cancelados: ${cantidadConjuntos}
+              - Unidades por conjunto: ${unidadesPorConjunto}
+              - Unidades totales a devolver: ${unidadesADevolver}`);
+          } else {
+            // Caso de compatibilidad: item.cantidad ya contiene las unidades totales
+            unidadesADevolver = item.cantidad;
+
+            console.log(`📦 Devolviendo stock por conjuntos (compatibilidad):
+              - Producto: ${producto.nombre}
+              - Unidades a devolver: ${unidadesADevolver}`);
+          }
+        } else {
+          // Para productos individuales: item.cantidad ya son unidades
+          unidadesADevolver = item.cantidad;
+
+          console.log(`📦 Devolviendo stock individual (cliente):
+            - Producto: ${producto.nombre}
+            - Unidades a devolver: ${unidadesADevolver}`);
+        }
+
+        // Devolver el stock
+        const stockAnterior = producto.stock;
+        producto.stock += unidadesADevolver;
         await producto.save();
-        console.log(`✅ Stock del producto ${producto.nombre} actualizado: +${item.cantidad} (por cancelación de cliente).`);
+
+        console.log(`✅ Stock del producto ${producto.nombre} actualizado por cancelación de cliente:
+          - Stock anterior: ${stockAnterior}
+          - Unidades devueltas: ${unidadesADevolver}
+          - Nuevo stock: ${producto.stock}`);
       } else {
         console.warn(`⚠️ Producto con ID ${item.productId} no encontrado al intentar devolver stock por cancelación de cliente.`);
       }
@@ -128,9 +168,16 @@ exports.cancelarPedidoCliente = async (req, res) => {
     pedido.estado = 'cancelado';
     await pedido.save();
 
-    res.status(200).json({ mensaje: 'Pedido cancelado con éxito. Stock devuelto.', pedido });
+    res.status(200).json({
+      mensaje: 'Pedido cancelado con éxito. Stock devuelto.',
+      pedido
+    });
   } catch (error) {
     console.error('❌ Error al cancelar pedido por cliente:', error);
-    res.status(500).json({ mensaje: 'Error al cancelar el pedido.', detalle: error.message });
+    console.error('📝 Stack trace:', error.stack);
+    res.status(500).json({
+      mensaje: 'Error al cancelar el pedido.',
+      detalle: error.message
+    });
   }
 };

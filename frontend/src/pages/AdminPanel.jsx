@@ -97,8 +97,8 @@ function AdminPanel() {
   const [todosLosProductos, setTodosLosProductos] = useState([]);
   const [productSearchTerm, setProductSearchTerm] = useState('');
 
-  const orderStatuses = ['confirmado', 'entregado', 'cancelado', 'listo_para_recoger'];
-
+  const orderStatuses = ['listo_para_recoger', 'confirmado', 'entregado', 'cancelado'];
+  
   const clearMessage = useCallback((type) => {
     setTimeout(() => {
       if (type === 'success') {
@@ -348,10 +348,8 @@ function AdminPanel() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pendiente': return '#f59e0b';
+      case 'listo_para_recoger': return '#3b82f6';  // Azul para listo para entregar
       case 'confirmado': return '#10b981';
-      case 'listo_para_recoger': return '#3b82f6';
-      case 'enviado': return '#8b5cf6';
       case 'entregado': return '#22c55e';
       case 'cancelado': return '#ef4444';
       default: return '#6b7280';
@@ -360,10 +358,8 @@ function AdminPanel() {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'pendiente': return '⏳';
+      case 'listo_para_recoger': return '📦';  // Paquete para listo para entregar
       case 'confirmado': return '✅';
-      case 'listo_para_recoger': return '📦';
-      case 'enviado': return '🚚';
       case 'entregado': return '🎉';
       case 'cancelado': return '❌';
       default: return '📋';
@@ -2283,20 +2279,12 @@ function AdminPanel() {
                               style={orderCardStatusSelectStyle}
                               disabled={pedido.estado === 'entregado' || pedido.estado === 'cancelado'}
                             >
-                              <option value="pendiente">⏳ Pendiente</option>
+                              <option value="listo_para_recoger">📦 Listo para Entregar</option>
                               <option value="confirmado">✅ Confirmado</option>
                               <option value="entregado">📦 Entregado</option>
                               <option value="cancelado">❌ Cancelado</option>
                             </select>
                           </div>
-
-                          {/* Botón de eliminar */}
-                          <button
-                            onClick={() => handleDeleteOrder(pedido._id)}
-                            style={orderCardDeleteButtonStyle}
-                          >
-                            🗑️ Eliminar
-                          </button>
                         </div>
                       </div>
                     </div>

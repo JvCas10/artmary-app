@@ -126,15 +126,12 @@ function MisPedidos() {
     return resultado;
   };
 
-
   const getClientStatusText = (status) => {
     switch (status) {
-      case 'pendiente':
-        return 'Pendiente de Confirmación';
+      case 'listo_para_recoger':
+        return 'Listo para Entregar'; // CAMBIO: nuevo texto para el usuario
       case 'confirmado':
         return 'Confirmado, en Proceso';
-      case 'listo_para_recoger':
-        return 'Listo para Recoger';
       case 'enviado':
         return 'Enviado';
       case 'entregado':
@@ -148,12 +145,10 @@ function MisPedidos() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pendiente':
-        return '#f59e0b';
+      case 'listo_para_recoger':
+        return '#3b82f6'; // Azul para listo para entregar
       case 'confirmado':
         return '#10b981';
-      case 'listo_para_recoger':
-        return '#3b82f6';
       case 'enviado':
         return '#8b5cf6';
       case 'entregado':
@@ -167,12 +162,10 @@ function MisPedidos() {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'pendiente':
-        return '⏳';
+      case 'listo_para_recoger':
+        return '📦'; // Paquete para listo para entregar
       case 'confirmado':
         return '✅';
-      case 'listo_para_recoger':
-        return '📦';
       case 'enviado':
         return '🚚';
       case 'entregado':
@@ -434,7 +427,8 @@ function MisPedidos() {
                   </div>
 
                   <div style={orderActionsStyle}>
-                    {pedido.estado === 'pendiente' && (
+                    {/* ✅ CONDICIÓN CORREGIDA: Ahora incluye 'confirmado' y 'listo_para_recoger' */}
+                    {(pedido.estado === 'pendiente' || pedido.estado === 'confirmado' || pedido.estado === 'listo_para_recoger') && (
                       <button
                         onClick={() => handleCancelOrder(pedido._id)}
                         className="cancel-button"
@@ -455,7 +449,6 @@ function MisPedidos() {
     </div>
   );
 }
-
 // Estilos (mantener los existentes)
 const containerStyle = {
   minHeight: '100vh',
