@@ -26,34 +26,46 @@ router.post('/confirmar', authMiddleware, async (req, res) => {
       // Determinar el tipo de venta
       const tipoVenta = item.tipoVenta || 'individual';
       
-      // Validar stock disponible
+      // ✅ VALIDACIÓN DE STOCK CORREGIDA: item.cantidad siempre viene en unidades totales
       if (producto.stock < item.cantidad) {
         return res.status(400).json({ error: `Stock insuficiente para el producto: ${producto.nombre}. Stock disponible: ${producto.stock}` });
       }
 
       // Calcular ganancia y subtotal
       let gananciaProducto, subtotalProducto;
+      let cantidadConjuntos = 1; // Por defecto para productos individuales
       
       if (tipoVenta === 'conjunto') {
-        // Para conjuntos: calcular basado en el precio del conjunto
-        const cantidadConjuntos = item.cantidadOriginal || Math.floor(item.cantidad / (producto.unidadesPorConjunto || 1));
+        // Para conjuntos: calcular cuántos conjuntos se están vendiendo
+        cantidadConjuntos = item.cantidadOriginal || Math.floor(item.cantidad / (producto.unidadesPorConjunto || 1));
         const precioCompraConjunto = producto.precioCompra * (producto.unidadesPorConjunto || 1);
         
         gananciaProducto = (producto.precioConjunto - precioCompraConjunto) * cantidadConjuntos;
         subtotalProducto = producto.precioConjunto * cantidadConjuntos;
+        
+        console.log(`🎁 Conjunto detectado:
+          - Producto: ${producto.nombre}
+          - Conjuntos vendidos: ${cantidadConjuntos}
+          - Unidades por conjunto: ${producto.unidadesPorConjunto}
+          - Unidades totales: ${item.cantidad}
+          - Precio por conjunto: Q${producto.precioConjunto}`);
       } else {
         // Para individuales: calcular normalmente
         gananciaProducto = (producto.precioVenta - producto.precioCompra) * item.cantidad;
         subtotalProducto = producto.precioVenta * item.cantidad;
+        
+        console.log(`📦 Producto individual:
+          - Producto: ${producto.nombre}
+          - Unidades vendidas: ${item.cantidad}
+          - Precio unitario: Q${producto.precioVenta}`);
       }
 
-      // Preparar datos para guardar en la orden
+      // ✅ PREPARAR DATOS PARA GUARDAR EN LA ORDEN - INFORMACIÓN COMPLETA
       productosParaGuardarEnOrden.push({
         productId: producto._id,
         nombre: producto.nombre,
-        cantidad: tipoVenta === 'conjunto' ? 
-          (item.cantidadOriginal || Math.floor(item.cantidad / (producto.unidadesPorConjunto || 1))) : 
-          item.cantidad,
+        // ✅ CORRECCIÓN CRÍTICA: Siempre guardar las unidades totales que se descontaron del stock
+        cantidad: item.cantidad, // Esta es la cantidad real en unidades que se descontó del stock
         precioVenta: tipoVenta === 'conjunto' ? producto.precioConjunto : producto.precioVenta,
         precioCompra: tipoVenta === 'conjunto' ? 
           (producto.precioCompra * (producto.unidadesPorConjunto || 1)) : 
@@ -62,14 +74,14 @@ router.post('/confirmar', authMiddleware, async (req, res) => {
         ganancia: gananciaProducto,
         // Campos adicionales para el nuevo sistema
         tipoVenta: tipoVenta,
-        cantidadOriginal: tipoVenta === 'conjunto' ? 
-          (item.cantidadOriginal || Math.floor(item.cantidad / (producto.unidadesPorConjunto || 1))) : 
-          item.cantidad,
+        // ✅ NUEVA LÓGICA: Guardar tanto la cantidad de conjuntos como las unidades totales
+        cantidadOriginal: tipoVenta === 'conjunto' ? cantidadConjuntos : item.cantidad,
+        unidadesTotales: item.cantidad, // Siempre las unidades que se descontaron del stock
         ...(tipoVenta === 'conjunto' && {
           nombreConjunto: producto.nombreConjunto,
           unidadesPorConjunto: producto.unidadesPorConjunto,
           precioConjunto: producto.precioConjunto,
-          descripcionVenta: `${item.cantidadOriginal || Math.floor(item.cantidad / (producto.unidadesPorConjunto || 1))} ${producto.nombreConjunto}(s)`
+          descripcionVenta: `${cantidadConjuntos} ${producto.nombreConjunto}(s) = ${item.cantidad} unidades`
         }),
         ...(tipoVenta === 'individual' && {
           descripcionVenta: `${item.cantidad} unidad(es)`
@@ -79,16 +91,26 @@ router.post('/confirmar', authMiddleware, async (req, res) => {
       totalPedido += subtotalProducto;
       gananciaTotalPedido += gananciaProducto;
 
-      console.log(`📊 Producto: ${producto.nombre} - Tipo: ${tipoVenta} - Ganancia: Q${gananciaProducto.toFixed(2)}`);
+      console.log(`📊 Resumen producto:
+        - Nombre: ${producto.nombre}
+        - Tipo: ${tipoVenta}
+        - Ganancia: Q${gananciaProducto.toFixed(2)}
+        - Subtotal: Q${subtotalProducto.toFixed(2)}`);
     }
 
-    // Actualizar stock (siempre en unidades totales)
+    // ✅ ACTUALIZAR STOCK (siempre en unidades totales)
     for (let item of itemsDelPedido) {
       const producto = await Producto.findById(item._id);
-      producto.stock -= item.cantidad; // item.cantidad ya viene en unidades del frontend
-      await producto.save();
-      
-      console.log(`📦 Stock actualizado para ${producto.nombre}: -${item.cantidad} unidades (restante: ${producto.stock})`);
+      if (producto) {
+        const stockAnterior = producto.stock;
+        producto.stock -= item.cantidad; // item.cantidad ya viene en unidades totales del frontend
+        await producto.save();
+        
+        console.log(`📦 Stock actualizado para ${producto.nombre}:
+          - Stock anterior: ${stockAnterior}
+          - Unidades descontadas: ${item.cantidad}
+          - Stock restante: ${producto.stock}`);
+      }
     }
 
     // Crear el pedido
@@ -103,7 +125,11 @@ router.post('/confirmar', authMiddleware, async (req, res) => {
 
     await nuevoPedido.save();
 
-    console.log(`✅ Pedido confirmado - Total: Q${totalPedido.toFixed(2)} - Ganancia: Q${gananciaTotalPedido.toFixed(2)}`);
+    console.log(`✅ Pedido confirmado exitosamente:
+      - ID: ${nuevoPedido._id}
+      - Total: Q${totalPedido.toFixed(2)}
+      - Ganancia: Q${gananciaTotalPedido.toFixed(2)}
+      - Productos: ${productosParaGuardarEnOrden.length}`);
 
     return res.status(200).json({
       mensaje: 'Pedido confirmado y stock actualizado. Pedido guardado.',
@@ -112,8 +138,12 @@ router.post('/confirmar', authMiddleware, async (req, res) => {
       gananciaTotal: gananciaTotalPedido
     });
   } catch (err) {
-    console.error('Error al confirmar pedido:', err);
-    res.status(500).json({ error: 'Error al procesar el pedido', detalle: err.message });
+    console.error('❌ Error al confirmar pedido:', err);
+    console.error('📝 Stack trace:', err.stack);
+    res.status(500).json({ 
+      error: 'Error al procesar el pedido', 
+      detalle: err.message 
+    });
   }
 });
 

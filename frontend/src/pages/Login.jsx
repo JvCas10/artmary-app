@@ -71,7 +71,14 @@ function Login() {
   }, [mensaje, setMensaje]);
 
   const isSuccessMessage = (msg) => {
-    return msg.includes('exitoso') || msg.includes('registrado') || msg.includes('verificado') || msg.includes('✅');
+    // Solo considera éxito si contiene palabras específicas de éxito Y el emoji de éxito
+    return (
+      msg.includes('✅') ||
+      (msg.includes('exitoso') && !msg.includes('❌')) ||
+      (msg.includes('registrado') && !msg.includes('❌')) ||
+      (msg.includes('verificado') && !msg.includes('❌')) ||
+      msg.includes('enviado')
+    );
   };
 
   const handleLogin = async () => {
@@ -84,19 +91,26 @@ function Login() {
     setMensajeLocal('');
 
     try {
-      const success = await login(correo, contrasena);
-      if (success) {
-        navigate('/productos');
+      const result = await login(correo, contrasena);
+
+      if (result.success) {
+        setMensajeLocal('✅ Inicio de sesión exitoso');
+        setTimeout(() => {
+          navigate('/productos');
+        }, 1000);
+      } else {
+        // Manejar diferentes tipos de error
+        if (result.errorType === 'EMAIL_NO_VERIFICADO' && result.requiresVerification) {
+          setEmailNoVerificado(result.email || correo);
+          setMostrarVerificacion(true);
+          setMensajeLocal(result.message);
+        } else {
+          setMensajeLocal(result.message);
+        }
       }
     } catch (error) {
       console.error('Error en login:', error);
-
-      if (error.response?.data?.noVerificado) {
-        setEmailNoVerificado(correo);
-        setMostrarVerificacion(true);
-      } else {
-        setMensajeLocal(error.response?.data?.mensaje || '❌ Error al iniciar sesión');
-      }
+      setMensajeLocal('❌ Error inesperado. Intenta nuevamente');
     } finally {
       setIsLoading(false);
     }
@@ -144,10 +158,13 @@ function Login() {
   const handleReenviarVerificacion = async () => {
     setEnviandoVerificacion(true);
     try {
-      const response = await api.post('/auth/reenviar-verificacion', { email: emailNoVerificado });
+      const response = await api.post('/auth/reenviar-verificacion', {
+        correo: emailNoVerificado  // Cambio importante: usar 'correo' en lugar de 'email'
+      });
       setMensajeLocal('✅ Email de verificación enviado. Revisa tu bandeja de entrada.');
       setMostrarVerificacion(false);
     } catch (error) {
+      console.error('Error al reenviar verificación:', error);
       setMensajeLocal('❌ Error al enviar email de verificación. Inténtalo más tarde.');
     } finally {
       setEnviandoVerificacion(false);
@@ -377,12 +394,23 @@ function Login() {
           {/* Mensaje */}
           {mensajeLocal && (
             <div style={{
-              ...(isMobile ? mobileMessageStyle : messageStyle),
-              ...(isSuccessMessage(mensajeLocal) ? successMessageStyle : errorMessageStyle)
+              padding: '12px',
+              borderRadius: '8px',
+              marginBottom: '20px',
+              textAlign: 'center',
+              fontSize: '14px',
+              fontWeight: '500',
+              background: isSuccessMessage(mensajeLocal)
+                ? '#d4edda'  // Verde para éxito
+                : '#f8d7da', // Rojo para error
+              color: isSuccessMessage(mensajeLocal)
+                ? '#155724'  // Texto verde oscuro para éxito
+                : '#721c24', // Texto rojo oscuro para error
+              border: `1px solid ${isSuccessMessage(mensajeLocal)
+                ? '#c3e6cb'  // Borde verde para éxito
+                : '#f5c6cb'  // Borde rojo para error
+                }`
             }}>
-              <span style={messageIconStyle}>
-                {isSuccessMessage(mensajeLocal) ? '✅' : '❌'}
-              </span>
               {mensajeLocal}
             </div>
           )}

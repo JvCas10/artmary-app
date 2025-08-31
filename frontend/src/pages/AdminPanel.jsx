@@ -1317,8 +1317,8 @@ function AdminPanel() {
           </div>
         )}
         {activeTab === 'estadisticas' && (
-          <div style={tabContentStyle} className="fadeIn">
-            {/* Header con filtros */}
+          <div style={tabContentStyle} className="fadeIn estadisticas-container">
+            {/* Header único - NO duplicado */}
             <div style={{
               background: 'white',
               borderRadius: '1.5rem',
@@ -1335,7 +1335,7 @@ function AdminPanel() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.75rem'
-              }}>
+              }} className="estadisticas-title">
                 <span style={{
                   background: 'linear-gradient(135deg, #ec4899, #be185d)',
                   WebkitBackgroundClip: 'text',
@@ -1345,251 +1345,192 @@ function AdminPanel() {
                 Estadísticas Avanzadas
               </h2>
 
-              {/* Header con filtros mejorado */}
+              {/* Información del período seleccionado */}
               <div style={{
-                background: 'white',
-                borderRadius: '1.5rem',
-                padding: '2rem',
-                marginBottom: '2rem',
-                boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+                padding: '1rem',
+                background: '#f1f5f9',
+                borderRadius: '0.75rem',
+                marginBottom: '1.5rem',
                 border: '1px solid #e2e8f0'
               }}>
-                <h2 style={{
-                  fontSize: '2rem',
-                  fontWeight: '800',
-                  color: '#1e293b',
-                  marginBottom: '1.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem'
+                <p style={{
+                  margin: 0,
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#475569'
                 }}>
-                  <span style={{
-                    background: 'linear-gradient(135deg, #ec4899, #be185d)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    fontSize: '2.5rem'
-                  }}>📊</span>
-                  Estadísticas Avanzadas
-                </h2>
+                  📅 Período seleccionado: {' '}
+                  <span style={{ color: '#ec4899' }}>
+                    {filtroTemporal === 'dia' && `Día ${fechaSeleccionada.toLocaleDateString('es-GT', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}`}
+                    {filtroTemporal === 'semana' && `Semana del ${(() => {
+                      const inicioSemana = new Date(fechaSeleccionada);
+                      inicioSemana.setDate(fechaSeleccionada.getDate() - fechaSeleccionada.getDay());
+                      const finSemana = new Date(inicioSemana);
+                      finSemana.setDate(inicioSemana.getDate() + 6);
+                      return `${inicioSemana.toLocaleDateString('es-GT')} al ${finSemana.toLocaleDateString('es-GT')}`;
+                    })()}`}
+                    {filtroTemporal === 'mes' && fechaSeleccionada.toLocaleDateString('es-GT', {
+                      year: 'numeric',
+                      month: 'long'
+                    })}
+                  </span>
+                </p>
+              </div>
 
-                {/* Información del período seleccionado */}
-                <div style={{
-                  padding: '1rem',
-                  background: '#f1f5f9',
-                  borderRadius: '0.75rem',
-                  marginBottom: '1.5rem',
-                  border: '1px solid #e2e8f0'
-                }}>
-                  <p style={{
-                    margin: 0,
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: '#475569'
+              {/* Controles de filtros con clases responsive */}
+              <div className="filtros-container">
+                {/* Selector de período */}
+                <div className="filtro-grupo">
+                  <label className="filtro-label">
+                    📊 Tipo de período:
+                  </label>
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    flexWrap: 'wrap'
                   }}>
-                    📅 Período seleccionado: {' '}
-                    <span style={{ color: '#ec4899' }}>
-                      {filtroTemporal === 'dia' && `Día ${fechaSeleccionada.toLocaleDateString('es-GT', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}`}
-                      {filtroTemporal === 'semana' && `Semana del ${(() => {
-                        const inicioSemana = new Date(fechaSeleccionada);
-                        inicioSemana.setDate(fechaSeleccionada.getDate() - fechaSeleccionada.getDay());
-                        const finSemana = new Date(inicioSemana);
-                        finSemana.setDate(inicioSemana.getDate() + 6);
-                        return `${inicioSemana.toLocaleDateString('es-GT')} al ${finSemana.toLocaleDateString('es-GT')}`;
-                      })()}`}
-                      {filtroTemporal === 'mes' && fechaSeleccionada.toLocaleDateString('es-GT', {
-                        year: 'numeric',
-                        month: 'long'
-                      })}
-                    </span>
-                  </p>
+                    {[
+                      { value: 'dia', label: 'Día', icon: '📅' },
+                      { value: 'semana', label: 'Semana', icon: '📆' },
+                      { value: 'mes', label: 'Mes', icon: '🗓️' }
+                    ].map(periodo => (
+                      <button
+                        key={periodo.value}
+                        onClick={() => setFiltroTemporal(periodo.value)}
+                        style={{
+                          padding: '0.75rem 1rem',
+                          borderRadius: '0.75rem',
+                          border: '1px solid',
+                          borderColor: filtroTemporal === periodo.value ? 'transparent' : '#cbd5e1',
+                          background: filtroTemporal === periodo.value ? 'linear-gradient(135deg, #ec4899, #be185d)' : 'white',
+                          color: filtroTemporal === periodo.value ? 'white' : '#475569',
+                          cursor: 'pointer',
+                          fontWeight: '600',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          fontSize: '0.875rem',
+                          minHeight: '44px'
+                        }}
+                      >
+                        <span>{periodo.icon}</span>
+                        {periodo.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Controles de filtros */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                  gap: '1.5rem',
-                  alignItems: 'end'
-                }}>
-                  {/* Selector de período */}
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: '#475569',
-                      marginBottom: '0.5rem'
-                    }}>
-                      📊 Tipo de período:
-                    </label>
-                    <div style={{
-                      display: 'flex',
-                      gap: '0.5rem',
-                      flexWrap: 'wrap'
-                    }}>
-                      {[
-                        { value: 'dia', label: 'Día', icon: '📅' },
-                        { value: 'semana', label: 'Semana', icon: '📆' },
-                        { value: 'mes', label: 'Mes', icon: '🗓️' }
-                      ].map(periodo => (
-                        <button
-                          key={periodo.value}
-                          onClick={() => setFiltroTemporal(periodo.value)}
-                          style={{
-                            padding: '0.75rem 1rem',
-                            borderRadius: '0.75rem',
-                            border: '1px solid',
-                            borderColor: filtroTemporal === periodo.value ? 'transparent' : '#cbd5e1',
-                            background: filtroTemporal === periodo.value ? 'linear-gradient(135deg, #ec4899, #be185d)' : 'white',
-                            color: filtroTemporal === periodo.value ? 'white' : '#475569',
-                            cursor: 'pointer',
-                            fontWeight: '600',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            fontSize: '0.875rem'
-                          }}
-                        >
-                          <span>{periodo.icon}</span>
-                          {periodo.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Selector de fecha específica */}
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: '#475569',
-                      marginBottom: '0.5rem'
-                    }}>
-                      🗓️ Fecha específica:
-                    </label>
-                    <input
-                      type={filtroTemporal === 'mes' ? 'month' : filtroTemporal === 'semana' ? 'week' : 'date'}
-                      value={
-                        filtroTemporal === 'mes'
-                          ? `${fechaSeleccionada.getFullYear()}-${String(fechaSeleccionada.getMonth() + 1).padStart(2, '0')}`
-                          : filtroTemporal === 'semana'
-                            ? (() => {
-                              const year = fechaSeleccionada.getFullYear();
-                              const inicioAno = new Date(year, 0, 1);
-                              const diferenciaDias = Math.floor((fechaSeleccionada - inicioAno) / (24 * 60 * 60 * 1000));
-                              const numeroSemana = Math.ceil((diferenciaDias + inicioAno.getDay() + 1) / 7);
-                              return `${year}-W${String(numeroSemana).padStart(2, '0')}`;
-                            })()
-                            : fechaSeleccionada.toISOString().split('T')[0]
+                {/* Selector de fecha específica */}
+                <div className="filtro-grupo">
+                  <label className="filtro-label">
+                    🗓️ Fecha específica:
+                  </label>
+                  <input
+                    type={filtroTemporal === 'mes' ? 'month' : filtroTemporal === 'semana' ? 'week' : 'date'}
+                    value={
+                      filtroTemporal === 'mes'
+                        ? `${fechaSeleccionada.getFullYear()}-${String(fechaSeleccionada.getMonth() + 1).padStart(2, '0')}`
+                        : filtroTemporal === 'semana'
+                          ? (() => {
+                            const year = fechaSeleccionada.getFullYear();
+                            const inicioAno = new Date(year, 0, 1);
+                            const diferenciaDias = Math.floor((fechaSeleccionada - inicioAno) / (24 * 60 * 60 * 1000));
+                            const numeroSemana = Math.ceil((diferenciaDias + inicioAno.getDay() + 1) / 7);
+                            return `${year}-W${String(numeroSemana).padStart(2, '0')}`;
+                          })()
+                          : fechaSeleccionada.toISOString().split('T')[0]
+                    }
+                    onChange={(e) => {
+                      if (filtroTemporal === 'mes') {
+                        const [year, month] = e.target.value.split('-');
+                        setFechaSeleccionada(new Date(parseInt(year), parseInt(month) - 1, 1));
+                      } else if (filtroTemporal === 'semana') {
+                        const [year, week] = e.target.value.split('-W');
+                        const primerDiaAno = new Date(parseInt(year), 0, 1);
+                        const diasHastaSemana = (parseInt(week) - 1) * 7;
+                        const nuevaFecha = new Date(primerDiaAno.getTime() + diasHastaSemana * 24 * 60 * 60 * 1000);
+                        setFechaSeleccionada(nuevaFecha);
+                      } else {
+                        setFechaSeleccionada(new Date(e.target.value + 'T12:00:00'));
                       }
-                      onChange={(e) => {
-                        if (filtroTemporal === 'mes') {
-                          const [year, month] = e.target.value.split('-');
-                          setFechaSeleccionada(new Date(parseInt(year), parseInt(month) - 1, 1));
-                        } else if (filtroTemporal === 'semana') {
-                          const [year, week] = e.target.value.split('-W');
-                          const primerDiaAno = new Date(parseInt(year), 0, 1);
-                          const diasHastaSemana = (parseInt(week) - 1) * 7;
-                          const nuevaFecha = new Date(primerDiaAno.getTime() + diasHastaSemana * 24 * 60 * 60 * 1000);
-                          setFechaSeleccionada(nuevaFecha);
-                        } else {
-                          setFechaSeleccionada(new Date(e.target.value + 'T12:00:00'));
-                        }
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem 1rem',
-                        borderRadius: '0.75rem',
-                        border: '1px solid #cbd5e1',
-                        background: 'white',
-                        color: '#475569',
-                        fontSize: '0.875rem',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                    />
-                  </div>
+                    }}
+                    className="filtro-input"
+                  />
+                </div>
 
-                  {/* Botón de resetear a hoy */}
-                  <div>
-                    <button
-                      onClick={() => {
-                        setFechaSeleccionada(new Date());
-                        setFiltroTemporal('mes');
-                      }}
-                      style={{
-                        padding: '0.75rem 1.5rem',
-                        borderRadius: '0.75rem',
-                        border: '1px solid #e2e8f0',
-                        background: 'white',
-                        color: '#64748b',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                        transition: 'all 0.2s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.875rem',
-                        width: '100%',
-                        justifyContent: 'center'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.background = '#f8fafc';
-                        e.target.style.borderColor = '#cbd5e1';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.background = 'white';
-                        e.target.style.borderColor = '#e2e8f0';
-                      }}
-                    >
-                      <span>🔄</span>
-                      Resetear a Hoy
-                    </button>
-                  </div>
+                {/* Botón de resetear a hoy */}
+                <div className="filtro-grupo">
+                  <button
+                    onClick={() => {
+                      setFechaSeleccionada(new Date());
+                      setFiltroTemporal('mes');
+                    }}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.75rem',
+                      border: '1px solid #e2e8f0',
+                      background: 'white',
+                      color: '#64748b',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.875rem',
+                      width: '100%',
+                      justifyContent: 'center',
+                      minHeight: '44px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = '#f8fafc';
+                      e.target.style.borderColor = '#cbd5e1';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = 'white';
+                      e.target.style.borderColor = '#e2e8f0';
+                    }}
+                  >
+                    <span>🔄</span>
+                    Resetear a Hoy
+                  </button>
+                </div>
 
-                  {/* Contador de ventas del período */}
+                {/* Contador de ventas del período */}
+                <div style={{
+                  padding: '1rem',
+                  background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)',
+                  borderRadius: '0.75rem',
+                  border: '1px solid #0ea5e9',
+                  textAlign: 'center'
+                }}>
                   <div style={{
-                    padding: '1rem',
-                    background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)',
-                    borderRadius: '0.75rem',
-                    border: '1px solid #0ea5e9',
-                    textAlign: 'center'
+                    fontSize: '1.5rem',
+                    fontWeight: '800',
+                    color: '#0369a1',
+                    marginBottom: '0.25rem'
                   }}>
-                    <div style={{
-                      fontSize: '1.5rem',
-                      fontWeight: '800',
-                      color: '#0369a1',
-                      marginBottom: '0.25rem'
-                    }}>
-                      {obtenerVentasFiltradas().length}
-                    </div>
-                    <div style={{
-                      fontSize: '0.75rem',
-                      color: '#0284c7',
-                      fontWeight: '600'
-                    }}>
-                      ventas en período
-                    </div>
+                    {obtenerVentasFiltradas().length}
+                  </div>
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#0284c7',
+                    fontWeight: '600'
+                  }}>
+                    ventas en período
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Tarjetas de métricas principales - 5 tarjetas */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '1.5rem',
-              marginBottom: '2rem'
-            }}>
+            {/* Tarjetas de métricas principales con clase responsive */}
+            <div className="estadisticas-metrics">
               {/* Ganancias Netas */}
               <div style={{
                 background: 'linear-gradient(135deg, #22c55e, #16a34a)',
@@ -1597,7 +1538,7 @@ function AdminPanel() {
                 padding: '2rem',
                 color: 'white',
                 boxShadow: '0 10px 25px rgba(34, 197, 94, 0.3)'
-              }}>
+              }} className="estadistica-card">
                 <h3 style={{
                   fontSize: '1.25rem',
                   fontWeight: '700',
@@ -1605,25 +1546,25 @@ function AdminPanel() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
-                }}>
+                }} className="estadistica-card-title">
                   💰 Ganancias Netas
                 </h3>
-                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }}>
+                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }} className="estadistica-value">
                   Q{formatPrice(estadisticas.gananciasTotal)}
                 </p>
-                <p style={{ opacity: 0.9, fontSize: '0.875rem' }}>
+                <p style={{ opacity: 0.9, fontSize: '0.875rem' }} className="estadistica-label">
                   Total de {estadisticas.totalVentas} ventas
                 </p>
               </div>
 
-              {/* NUEVA: Ventas Netas (Ingresos Brutos) */}
+              {/* Ventas Netas */}
               <div style={{
                 background: 'linear-gradient(135deg, #06b6d4, #0891b2)',
                 borderRadius: '1.5rem',
                 padding: '2rem',
                 color: 'white',
                 boxShadow: '0 10px 25px rgba(6, 182, 212, 0.3)'
-              }}>
+              }} className="estadistica-card">
                 <h3 style={{
                   fontSize: '1.25rem',
                   fontWeight: '700',
@@ -1631,13 +1572,13 @@ function AdminPanel() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
-                }}>
+                }} className="estadistica-card-title">
                   💵 Ventas Netas
                 </h3>
-                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }}>
+                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }} className="estadistica-value">
                   Q{formatPrice(estadisticas.ingresosBrutos)}
                 </p>
-                <p style={{ opacity: 0.9, fontSize: '0.875rem' }}>
+                <p style={{ opacity: 0.9, fontSize: '0.875rem' }} className="estadistica-label">
                   Ingresos totales del período
                 </p>
               </div>
@@ -1649,7 +1590,7 @@ function AdminPanel() {
                 padding: '2rem',
                 color: 'white',
                 boxShadow: '0 10px 25px rgba(59, 130, 246, 0.3)'
-              }}>
+              }} className="estadistica-card">
                 <h3 style={{
                   fontSize: '1.25rem',
                   fontWeight: '700',
@@ -1657,13 +1598,13 @@ function AdminPanel() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
-                }}>
+                }} className="estadistica-card-title">
                   📈 Unidades Vendidas
                 </h3>
-                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }}>
+                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }} className="estadistica-value">
                   {estadisticas.productosVendidos}
                 </p>
-                <p style={{ opacity: 0.9, fontSize: '0.875rem' }}>
+                <p style={{ opacity: 0.9, fontSize: '0.875rem' }} className="estadistica-label">
                   Conjuntos: {estadisticas.totalConjuntosVendidos}
                 </p>
               </div>
@@ -1675,7 +1616,7 @@ function AdminPanel() {
                 padding: '2rem',
                 color: 'white',
                 boxShadow: '0 10px 25px rgba(139, 92, 246, 0.3)'
-              }}>
+              }} className="estadistica-card">
                 <h3 style={{
                   fontSize: '1.25rem',
                   fontWeight: '700',
@@ -1683,17 +1624,17 @@ function AdminPanel() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
-                }}>
+                }} className="estadistica-card-title">
                   📦 Stock Total
                 </h3>
-                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }}>
+                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }} className="estadistica-value">
                   {estadisticas.productosEnStock}
                 </p>
                 <p style={{
                   opacity: 0.9,
                   fontSize: '0.875rem',
                   color: estadisticas.productosSinStock > 0 ? '#fbbf24' : 'inherit'
-                }}>
+                }} className="estadistica-label">
                   Sin stock: {estadisticas.productosSinStock}
                 </p>
               </div>
@@ -1705,7 +1646,7 @@ function AdminPanel() {
                 padding: '2rem',
                 color: 'white',
                 boxShadow: '0 10px 25px rgba(245, 158, 11, 0.3)'
-              }}>
+              }} className="estadistica-card">
                 <h3 style={{
                   fontSize: '1.25rem',
                   fontWeight: '700',
@@ -1713,16 +1654,16 @@ function AdminPanel() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'
-                }}>
+                }} className="estadistica-card-title">
                   📊 Margen Promedio
                 </h3>
-                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }}>
+                <p style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.5rem', lineHeight: 1 }} className="estadistica-value">
                   {estadisticas.ingresosBrutos > 0 ?
                     `${((estadisticas.gananciasTotal / estadisticas.ingresosBrutos) * 100).toFixed(1)}%` :
                     '0%'
                   }
                 </p>
-                <p style={{ opacity: 0.9, fontSize: '0.875rem' }}>
+                <p style={{ opacity: 0.9, fontSize: '0.875rem' }} className="estadistica-label">
                   {estadisticas.totalVentas > 0 ?
                     `Promedio por venta: Q${formatPrice(estadisticas.ingresosBrutos / estadisticas.totalVentas)}` :
                     'No hay ventas registradas'
@@ -1731,14 +1672,9 @@ function AdminPanel() {
               </div>
             </div>
 
-            {/* Gráficas */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))',
-              gap: '2rem',
-              marginBottom: '2rem'
-            }}>
-              {/* Evolución de ventas - Datos simulados basados en ventas reales */}
+            {/* Gráficas con clase responsive y scroll */}
+            <div className="tipo-ventas-grid">
+              {/* Evolución de ventas */}
               <div style={{
                 background: 'white',
                 borderRadius: '1.5rem',
@@ -1749,61 +1685,57 @@ function AdminPanel() {
                 <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', color: '#1e293b' }}>
                   📈 Evolución de Ventas (Últimos 7 días)
                 </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={(() => {
-                    // Generar datos de los últimos 7 días basados en ventas reales
-                    const datos = [];
-                    const hoy = new Date();
-
-                    for (let i = 6; i >= 0; i--) {
-                      const fecha = new Date(hoy);
-                      fecha.setDate(hoy.getDate() - i);
-
-                      const ventasDelDia = obtenerTodasLasVentas().filter(v => {
-                        const fechaVenta = new Date(v.fecha);
-                        return fechaVenta.toDateString() === fecha.toDateString();
-                      });
-
-                      const gananciasDelDia = ventasDelDia.reduce((acc, v) => acc + (v.gananciaTotal || 0), 0);
-
-                      datos.push({
-                        fecha: fecha.toLocaleDateString('es-GT', { weekday: 'short', day: 'numeric' }),
-                        ventas: ventasDelDia.length,
-                        ganancias: gananciasDelDia
-                      });
-                    }
-
-                    return datos;
-                  })()}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="fecha" stroke="#64748b" />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip
-                      contentStyle={{
-                        background: 'white',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '0.75rem',
-                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="ganancias"
-                      stroke="#ec4899"
-                      fill="#ec4899"
-                      fillOpacity={0.3}
-                      name="Ganancias (Q)"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="ventas"
-                      stroke="#3b82f6"
-                      strokeWidth={3}
-                      dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
-                      name="Número de Ventas"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <div className="grafico-scroll">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={(() => {
+                      const datos = [];
+                      const hoy = new Date();
+                      for (let i = 6; i >= 0; i--) {
+                        const fecha = new Date(hoy);
+                        fecha.setDate(hoy.getDate() - i);
+                        const ventasDelDia = obtenerTodasLasVentas().filter(v => {
+                          const fechaVenta = new Date(v.fecha);
+                          return fechaVenta.toDateString() === fecha.toDateString();
+                        });
+                        const gananciasDelDia = ventasDelDia.reduce((acc, v) => acc + (v.gananciaTotal || 0), 0);
+                        datos.push({
+                          fecha: fecha.toLocaleDateString('es-GT', { weekday: 'short', day: 'numeric' }),
+                          ventas: ventasDelDia.length,
+                          ganancias: gananciasDelDia
+                        });
+                      }
+                      return datos;
+                    })()}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="fecha" stroke="#64748b" />
+                      <YAxis stroke="#64748b" />
+                      <Tooltip
+                        contentStyle={{
+                          background: 'white',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '0.75rem',
+                          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="ganancias"
+                        stroke="#ec4899"
+                        fill="#ec4899"
+                        fillOpacity={0.3}
+                        name="Ganancias (Q)"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="ventas"
+                        stroke="#3b82f6"
+                        strokeWidth={3}
+                        dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                        name="Número de Ventas"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
 
               {/* Productos más vendidos */}
@@ -1817,40 +1749,37 @@ function AdminPanel() {
                 <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', color: '#1e293b' }}>
                   🏆 Top 5 Productos Más Vendidos
                 </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={obtenerProductosMasVendidos().slice(0, 5).map(p => ({
-                    nombre: p.nombre.length > 15 ? p.nombre.substring(0, 15) + '...' : p.nombre,
-                    cantidad: p.cantidadVendida
-                  }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="nombre" stroke="#64748b" angle={-45} textAnchor="end" height={100} />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip
-                      contentStyle={{
-                        background: 'white',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '0.75rem',
-                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
-                      }}
-                    />
-                    <Bar
-                      dataKey="cantidad"
-                      fill="#22c55e"
-                      radius={[4, 4, 0, 0]}
-                      name="Unidades Vendidas"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="grafico-scroll">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={obtenerProductosMasVendidos().slice(0, 5).map(p => ({
+                      nombre: p.nombre.length > 15 ? p.nombre.substring(0, 15) + '...' : p.nombre,
+                      cantidad: p.cantidadVendida
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="nombre" stroke="#64748b" angle={-45} textAnchor="end" height={100} />
+                      <YAxis stroke="#64748b" />
+                      <Tooltip
+                        contentStyle={{
+                          background: 'white',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '0.75rem',
+                          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Bar
+                        dataKey="cantidad"
+                        fill="#22c55e"
+                        radius={[4, 4, 0, 0]}
+                        name="Unidades Vendidas"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
 
-            {/* Estado del inventario */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-              gap: '2rem',
-              marginBottom: '2rem'
-            }}>
+            {/* Estado del inventario con clase responsive */}
+            <div className="tipo-ventas-grid">
               <div style={{
                 background: 'white',
                 borderRadius: '1.5rem',
@@ -1861,35 +1790,37 @@ function AdminPanel() {
                 <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', color: '#1e293b' }}>
                   📦 Estado del Inventario
                 </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { nombre: 'Stock Alto', cantidad: productos.filter(p => p.stock > 20).length, color: '#22c55e' },
-                        { nombre: 'Stock Medio', cantidad: productos.filter(p => p.stock > 5 && p.stock <= 20).length, color: '#f59e0b' },
-                        { nombre: 'Stock Bajo', cantidad: productos.filter(p => p.stock > 0 && p.stock <= 5).length, color: '#ef4444' },
-                        { nombre: 'Sin Stock', cantidad: productos.filter(p => p.stock === 0).length, color: '#6b7280' }
-                      ].filter(item => item.cantidad > 0)}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ nombre, cantidad }) => `${nombre}: ${cantidad}`}
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="cantidad"
-                    >
-                      {[
-                        { nombre: 'Stock Alto', cantidad: productos.filter(p => p.stock > 20).length, color: '#22c55e' },
-                        { nombre: 'Stock Medio', cantidad: productos.filter(p => p.stock > 5 && p.stock <= 20).length, color: '#f59e0b' },
-                        { nombre: 'Stock Bajo', cantidad: productos.filter(p => p.stock > 0 && p.stock <= 5).length, color: '#ef4444' },
-                        { nombre: 'Sin Stock', cantidad: productos.filter(p => p.stock === 0).length, color: '#6b7280' }
-                      ].filter(item => item.cantidad > 0).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="grafico-scroll">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { nombre: 'Stock Alto', cantidad: productos.filter(p => p.stock > 20).length, color: '#22c55e' },
+                          { nombre: 'Stock Medio', cantidad: productos.filter(p => p.stock > 5 && p.stock <= 20).length, color: '#f59e0b' },
+                          { nombre: 'Stock Bajo', cantidad: productos.filter(p => p.stock > 0 && p.stock <= 5).length, color: '#ef4444' },
+                          { nombre: 'Sin Stock', cantidad: productos.filter(p => p.stock === 0).length, color: '#6b7280' }
+                        ].filter(item => item.cantidad > 0)}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ nombre, cantidad }) => `${nombre}: ${cantidad}`}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="cantidad"
+                      >
+                        {[
+                          { nombre: 'Stock Alto', cantidad: productos.filter(p => p.stock > 20).length, color: '#22c55e' },
+                          { nombre: 'Stock Medio', cantidad: productos.filter(p => p.stock > 5 && p.stock <= 20).length, color: '#f59e0b' },
+                          { nombre: 'Stock Bajo', cantidad: productos.filter(p => p.stock > 0 && p.stock <= 5).length, color: '#ef4444' },
+                          { nombre: 'Sin Stock', cantidad: productos.filter(p => p.stock === 0).length, color: '#6b7280' }
+                        ].filter(item => item.cantidad > 0).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
 
               {/* Resumen de rentabilidad */}
@@ -1903,7 +1834,7 @@ function AdminPanel() {
                 <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', color: '#1e293b' }}>
                   💡 Resumen de Rentabilidad
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className="estadistica-card-content">
                   <div style={{
                     padding: '1rem',
                     background: '#f1f5f9',
@@ -1911,9 +1842,9 @@ function AdminPanel() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center'
-                  }}>
-                    <span style={{ fontWeight: '600', color: '#475569' }}>Ingresos Brutos:</span>
-                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>
+                  }} className="estadistica-item">
+                    <span style={{ fontWeight: '600', color: '#475569' }} className="estadistica-label">Ingresos Brutos:</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }} className="estadistica-value">
                       Q{formatPrice(estadisticas.ingresosBrutos)}
                     </span>
                   </div>
@@ -1924,9 +1855,9 @@ function AdminPanel() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center'
-                  }}>
-                    <span style={{ fontWeight: '600', color: '#166534' }}>Ganancias Netas:</span>
-                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#166534' }}>
+                  }} className="estadistica-item">
+                    <span style={{ fontWeight: '600', color: '#166534' }} className="estadistica-label">Ganancias Netas:</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#166534' }} className="estadistica-value">
                       Q{formatPrice(estadisticas.gananciasTotal)}
                     </span>
                   </div>
@@ -1937,9 +1868,9 @@ function AdminPanel() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center'
-                  }}>
-                    <span style={{ fontWeight: '600', color: '#92400e' }}>Margen de Ganancia:</span>
-                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#92400e' }}>
+                  }} className="estadistica-item">
+                    <span style={{ fontWeight: '600', color: '#92400e' }} className="estadistica-label">Margen de Ganancia:</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#92400e' }} className="estadistica-value">
                       {estadisticas.ingresosBrutos > 0 ?
                         `${((estadisticas.gananciasTotal / estadisticas.ingresosBrutos) * 100).toFixed(1)}%` :
                         '0%'
@@ -1953,17 +1884,16 @@ function AdminPanel() {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center'
-                  }}>
-                    <span style={{ fontWeight: '600', color: '#3730a3' }}>Venta Promedio:</span>
-                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3730a3' }}>
+                  }} className="estadistica-item">
+                    <span style={{ fontWeight: '600', color: '#3730a3' }} className="estadistica-label">Venta Promedio:</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3730a3' }} className="estadistica-value">
                       Q{estadisticas.totalVentas > 0 ? formatPrice(estadisticas.gananciasTotal / estadisticas.totalVentas) : '0.00'}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* Tabla de productos con bajo stock */}
+            {/* Tabla de productos con bajo stock con scroll responsive */}
             {productos.filter(p => p.stock <= 5).length > 0 && (
               <div style={{
                 background: 'white',
@@ -1975,8 +1905,8 @@ function AdminPanel() {
                 <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', color: '#1e293b' }}>
                   ⚠️ Productos con Stock Bajo (≤ 5 unidades)
                 </h3>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="tabla-responsive">
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '400px' }}>
                     <thead>
                       <tr style={{ background: '#f1f5f9' }}>
                         <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '2px solid #e2e8f0', fontWeight: '700' }}>Producto</th>
@@ -2019,7 +1949,6 @@ function AdminPanel() {
             )}
           </div>
         )}
-
         {/* Pestañas existentes de productos y pedidos */}
         {activeTab === 'productos' && (
           <div style={tabContentStyle} className="fadeIn">
@@ -2418,6 +2347,7 @@ const orderCardStatusSelectStyle = {
   cursor: 'pointer',
   transition: 'all 0.2s ease'
 };
+
 
 
 // Estilos responsive para pedidos
@@ -2893,6 +2823,9 @@ const historialResumenGananciaRedesignedStyle = {
   fontWeight: '600',
   color: '#22c55e'
 };
+
+
+
 
 
 
@@ -3515,98 +3448,6 @@ const historialProductoSubtotalStyle = {
   fontWeight: '600',
   textAlign: 'right'
 };
-
-// Estilos para estadísticas
-const estadisticasContainerStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '2rem'
-};
-
-const estadisticasMetricsStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-  gap: '2rem',
-  '@media (max-width: 768px)': {
-    gridTemplateColumns: '1fr',
-    gap: '1rem'
-  }
-};
-
-const estadisticaCardStyle = {
-  background: 'white',
-  borderRadius: '1rem',
-  padding: '2rem',
-  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-  border: '1px solid var(--neutral-200)'
-};
-
-const estadisticaCardTitleStyle = {
-  fontSize: '1.25rem',
-  fontWeight: '700',
-  color: 'var(--neutral-800)',
-  marginBottom: '1.5rem',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.5rem'
-};
-
-const estadisticaCardContentStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '1rem'
-};
-
-const estadisticaItemStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: '0.75rem',
-  background: 'var(--neutral-50)',
-  borderRadius: '0.5rem',
-  border: '1px solid var(--neutral-200)'
-};
-
-const estadisticaLabelStyle = {
-  fontSize: '0.875rem',
-  color: 'var(--neutral-600)',
-  fontWeight: '500'
-};
-
-const estadisticaValueStyle = {
-  fontSize: '1.125rem',
-  fontWeight: '700',
-  color: 'var(--neutral-800)'
-};
-
-const ventasPorTipoStyle = {
-  background: 'white',
-  borderRadius: '1rem',
-  padding: '2rem',
-  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-  border: '1px solid var(--neutral-200)'
-};
-
-const analisisTitleStyle = {
-  fontSize: '1.25rem',
-  fontWeight: '700',
-  color: 'var(--neutral-800)',
-  marginBottom: '1.5rem',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.5rem'
-};
-
-const tipoVentasGridStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-  gap: '2rem',
-  '@media (max-width: 768px)': {
-    gridTemplateColumns: '1fr',
-    gap: '1rem'
-  }
-};
-
 
 // NUEVO - Estilos responsive para pedidos
 const orderCardMobileStyle = {
@@ -4260,7 +4101,95 @@ const clearSearchStyle = {
   alignItems: 'center',
   justifyContent: 'center'
 };
+// REEMPLAZA tus estilos de estadísticas actuales con estos:
 
+// Estilos básicos para estadísticas (sin media queries)
+const estadisticasContainerStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2rem'
+};
+
+// Eliminar las media queries de estos objetos JavaScript
+const estadisticasMetricsStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+  gap: '2rem'
+  // Quitar la media query - ahora está en CSS
+};
+
+const estadisticaCardStyle = {
+  background: 'white',
+  borderRadius: '1rem',
+  padding: '2rem',
+  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+  border: '1px solid var(--neutral-200)',
+  transition: 'all 0.3s ease'
+};
+
+const estadisticaCardTitleStyle = {
+  fontSize: '1.25rem',
+  fontWeight: '700',
+  color: 'var(--neutral-800)',
+  marginBottom: '1.5rem',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem'
+};
+
+const estadisticaCardContentStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem'
+};
+
+const estadisticaItemStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: '0.75rem',
+  background: 'var(--neutral-50)',
+  borderRadius: '0.5rem',
+  border: '1px solid var(--neutral-200)'
+};
+
+const estadisticaLabelStyle = {
+  fontSize: '0.875rem',
+  color: 'var(--neutral-600)',
+  fontWeight: '500'
+};
+
+const estadisticaValueStyle = {
+  fontSize: '1.125rem',
+  fontWeight: '700',
+  color: 'var(--neutral-800)'
+};
+
+const ventasPorTipoStyle = {
+  background: 'white',
+  borderRadius: '1rem',
+  padding: '2rem',
+  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+  border: '1px solid var(--neutral-200)'
+};
+
+const analisisTitleStyle = {
+  fontSize: '1.25rem',
+  fontWeight: '700',
+  color: 'var(--neutral-800)',
+  marginBottom: '1.5rem',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem'
+};
+
+// Eliminar las media queries de este objeto también
+const tipoVentasGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+  gap: '2rem'
+  // Quitar la media query - ahora está en CSS
+};
 // Estilos para estadísticas avanzadas con gráficas
 const estadisticasHeaderStyle = {
   display: 'flex',
@@ -5347,6 +5276,7 @@ const historialCardGananciaStyle = {
   color: '#22c55e'
 };
 
+// REEMPLAZA tu styleSheet.innerText actual con esto:
 const styleSheet = document.createElement("style");
 styleSheet.innerText = `
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -5359,6 +5289,25 @@ styleSheet.innerText = `
     display: flex;
     flex-direction: column;
     gap: 1rem;
+  }
+  
+  /* NUEVOS ESTILOS PARA ESTADÍSTICAS RESPONSIVE */
+  .estadisticas-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+  
+  .estadisticas-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+  }
+  
+  .tipo-ventas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
   }
   
   @media (max-width: 768px) {
@@ -5443,6 +5392,84 @@ styleSheet.innerText = `
       padding: 0.75rem !important;
       text-align: center !important;
     }
+    
+    /* ESTADÍSTICAS RESPONSIVE - NUEVOS ESTILOS */
+    .estadisticas-container {
+      gap: 1.5rem !important;
+      padding: 0.5rem !important;
+    }
+    
+    .estadisticas-metrics {
+      grid-template-columns: 1fr !important;
+      gap: 1rem !important;
+    }
+    
+    .tipo-ventas-grid {
+      grid-template-columns: 1fr !important;
+      gap: 1rem !important;
+    }
+    
+    /* Ajustes para cards de estadísticas */
+    .estadistica-card {
+      padding: 1.5rem !important;
+      border-radius: 1rem !important;
+    }
+    
+    .estadistica-card-title {
+      font-size: 1.125rem !important;
+      margin-bottom: 1rem !important;
+      text-align: center !important;
+      flex-direction: column !important;
+      gap: 0.5rem !important;
+    }
+    
+    .estadistica-card-content {
+      gap: 0.75rem !important;
+    }
+    
+    .estadistica-item {
+      padding: 0.625rem !important;
+      flex-direction: column !important;
+      text-align: center !important;
+      gap: 0.25rem !important;
+    }
+    
+    .estadistica-label {
+      font-size: 0.8rem !important;
+    }
+    
+    .estadistica-value {
+      font-size: 1rem !important;
+    }
+    
+    /* Gráficos responsive */
+    .recharts-wrapper {
+      min-width: 300px !important;
+    }
+    
+    .recharts-responsive-container {
+      min-height: 250px !important;
+    }
+    
+    /* Scroll horizontal para gráficos */
+    .grafico-scroll {
+      overflow-x: auto !important;
+      padding-bottom: 0.5rem !important;
+    }
+    
+    .grafico-scroll::-webkit-scrollbar {
+      height: 4px;
+    }
+    
+    .grafico-scroll::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 2px;
+    }
+    
+    .grafico-scroll::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 2px;
+    }
   }
   
   @media (max-width: 480px) {
@@ -5482,6 +5509,39 @@ styleSheet.innerText = `
     
     .stat-label {
       font-size: 0.8rem !important;
+    }
+    
+    /* ESTADÍSTICAS MOBILE PEQUEÑO */
+    .estadisticas-container {
+      padding: 0.25rem !important;
+      gap: 1rem !important;
+    }
+    
+    .estadistica-card {
+      padding: 1rem !important;
+      border-radius: 0.75rem !important;
+    }
+    
+    .estadistica-card-title {
+      font-size: 1rem !important;
+      margin-bottom: 0.75rem !important;
+    }
+    
+    .estadistica-card-content {
+      gap: 0.5rem !important;
+    }
+    
+    .estadistica-item {
+      padding: 0.5rem !important;
+      border-radius: 0.5rem !important;
+    }
+    
+    .estadistica-label {
+      font-size: 0.75rem !important;
+    }
+    
+    .estadistica-value {
+      font-size: 0.9rem !important;
     }
   }
 `;
