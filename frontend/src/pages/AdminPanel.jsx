@@ -21,6 +21,7 @@ function AdminPanel() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [filtroTemporal, setFiltroTemporal] = useState('mes');
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date());
+  const [searchedTerm, setSearchedTerm] = useState('');
   const navigate = useNavigate();
 
   // Estados de paginación
@@ -225,17 +226,6 @@ function AdminPanel() {
       }
     }
   }, [isAuthenticated, user, loading, obtenerProductos, obtenerTodosLosPedidos, obtenerVentas, obtenerTodosLosProductos]);
-
-  // Efecto para búsqueda de productos con debounce
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (isAuthenticated && user && user.rol === 'admin') {
-        obtenerProductos(1, productSearchTerm);
-      }
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [productSearchTerm, isAuthenticated, user, obtenerProductos]);
 
   const handleProductsPageChange = (newPage) => {
     obtenerProductos(newPage, productSearchTerm);
@@ -491,6 +481,7 @@ function AdminPanel() {
 
   return (
     <div className="admin-page-wrapper">
+      <br/><br/>
       {/* Hero Header */}
       <div className="hero-header">
         <div className="hero-content">
@@ -712,16 +703,33 @@ function AdminPanel() {
                     placeholder="Buscar productos por nombre o categoría..."
                     value={productSearchTerm}
                     onChange={(e) => setProductSearchTerm(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        setSearchedTerm(productSearchTerm); // ← Guardar término
+                        obtenerProductos(1, productSearchTerm);
+                      }
+                    }}
                     className="search-input"
                   />
                   {productSearchTerm && (
                     <button
-                      onClick={() => setProductSearchTerm('')}
+                      onClick={() => {
+                        setProductSearchTerm('');
+                              }}
                       className="clear-search"
                     >
-                      ❌
+                      ✕
                     </button>
                   )}
+                  <button
+                    onClick={() => {
+                      setSearchedTerm(productSearchTerm); // ← Guardar término
+                      obtenerProductos(1, productSearchTerm);
+                    }}
+                    className="search-button"
+                  >
+                    Buscar
+                  </button>
                 </div>
               </div>
             </div>
@@ -731,12 +739,12 @@ function AdminPanel() {
                 <div className="empty-icon">📦</div>
                 <h3 className="empty-title">No hay productos</h3>
                 <p className="empty-subtitle">
-                  {productSearchTerm ?
-                    `No se encontraron productos que coincidan con "${productSearchTerm}"` :
+                  {searchedTerm ? // ← Cambiar de productSearchTerm a searchedTerm
+                    `No se encontraron productos que coincidan con "${searchedTerm}"` :
                     'Comienza creando tu primer producto'
                   }
                 </p>
-                {!productSearchTerm && (
+                {!searchedTerm && ( // ← Cambiar de productSearchTerm a searchedTerm
                   <Link to="/crear-producto" className="primary-button">
                     <span className="button-icon">➕</span>
                     Crear Primer Producto
@@ -749,9 +757,9 @@ function AdminPanel() {
                   {productos.map((producto) => (
                     <div key={producto._id} className="product-card">
                       <div className="product-image-container">
-                        {producto.imagen ? (
+                        {producto.imagenUrl ? (
                           <img
-                            src={producto.imagen}
+                            src={producto.imagenUrl}
                             alt={producto.nombre}
                             className="product-image"
                           />
@@ -775,8 +783,8 @@ function AdminPanel() {
                             <span className="price-value">Q{formatPrice(producto.precioVenta)}</span>
                           </div>
                           <div className="product-price">
-                            <span className="price-label">Precio Costo:</span>
-                            <span className="price-value">Q{formatPrice(producto.precioCosto)}</span>
+                            <span className="price-label">Precio Compra:</span>
+                            <span className="price-value">Q{formatPrice(producto.precioCompra)}</span>
                           </div>
                         </div>
 
@@ -885,7 +893,6 @@ function AdminPanel() {
                           Ganancia: Q{formatPrice(order.gananciaTotal)}
                         </span>
                       </div>
-
                       <div className="order-card-actions-section">
                         {order.estado !== 'entregado' && order.estado !== 'cancelado' && (
                           <>

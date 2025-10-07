@@ -1187,7 +1187,7 @@
 
 .search-input {
   flex: 1;
-  padding: 1rem 0;
+  padding: 1rem 1.5rem 1rem 4rem;
   border: none;
   outline: none;
   font-size: 1rem;
@@ -1581,3 +1581,25 @@
   margin-top: 1rem;
 }
 
+.search-button {
+  padding: 1rem 2rem;
+  background: var(--gradient-primary);
+  color: white;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  border-radius: 0 var(--border-radius-2xl) var(--border-radius-2xl) 0;
+}
+
+.search-button:hover {
+  background: linear-gradient(135deg, #7c3aed, #db2777);
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.search-button:active {
+  transform: scale(0.98);
+}

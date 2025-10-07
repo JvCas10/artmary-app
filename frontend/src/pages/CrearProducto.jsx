@@ -172,10 +172,10 @@ function CrearProducto() {
       let response;
       if (isEditing) {
         response = await axios.put(`/productos/${productId}`, formData);
-        setMensaje('✅ Producto actualizado exitosamente');
+        setMensaje('Producto actualizado exitosamente');
       } else {
         response = await axios.post('/productos', formData);
-        setMensaje('✅ Producto creado exitosamente');
+        setMensaje('Producto creado exitosamente');
       }
 
       setError('');

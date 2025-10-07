@@ -5,6 +5,7 @@ import { CartContext } from '../context/CartContext';
 import { Link } from 'react-router-dom';
 import Pagination from '../components/Pagination';
 import ProductFilters from '../components/ProductFilters';
+import logoArtMary from '../assets/artmary-logo.png';
 
 function Catalogo() {
   const [productos, setProductos] = useState([]);
@@ -39,6 +40,8 @@ function Catalogo() {
   const obtenerProductos = async (page = 1, search = '', filtrosAplicados = {}) => {
     try {
       setLoading(true);
+      setProductos([]); // 🔧 LIMPIAR productos anteriores
+
       const token = localStorage.getItem('token');
 
       const params = new URLSearchParams({
@@ -58,7 +61,25 @@ function Catalogo() {
         }
       });
 
-      setProductos(response.data.productos || []);
+      // 🔧 Validar que no haya duplicados
+      const productosUnicos = response.data.productos || [];
+      const idsVistos = new Set();
+      const productosSinDuplicados = productosUnicos.filter(producto => {
+        if (idsVistos.has(producto._id)) {
+          console.warn('⚠️ Producto duplicado detectado:', producto.nombre);
+          return false;
+        }
+        idsVistos.add(producto._id);
+        return true;
+      });
+
+      console.log(`📦 Productos recibidos: ${productosUnicos.length}, Únicos: ${productosSinDuplicados.length}`);
+
+      // 🔧 AGREGAR ESTE LOG:
+      console.log('🆔 IDs COMPLETOS de productos:', productosSinDuplicados.map(p => `${p.nombre.substring(0, 20)} - ID: ${p._id}`));
+
+
+      setProductos(productosSinDuplicados);
       setPagination(response.data.pagination || {});
 
       if (response.data.filtros && response.data.filtros.categorias) {
@@ -68,7 +89,7 @@ function Catalogo() {
       setError('');
     } catch (err) {
       console.error("Error al obtener productos:", err);
-      setError('No se pudieron cargar los productos 😓');
+      setError('No se pudieron cargar los productos 😔');
       setProductos([]);
     } finally {
       setLoading(false);
@@ -79,13 +100,17 @@ function Catalogo() {
     obtenerProductos(1, searchTerm, filtros);
   }, []);
 
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      obtenerProductos(1, searchTerm, filtros);
-    }, 500);
+  // Nueva función para manejar la búsqueda al presionar el botón
+  const handleSearch = () => {
+    obtenerProductos(1, searchTerm, filtros);
+  };
 
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+  // Manejar búsqueda al presionar Enter
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   const handleFiltersChange = (nuevosFiltros) => {
     setFiltros(nuevosFiltros);
@@ -162,6 +187,10 @@ function Catalogo() {
   };
 
   const handlePageChange = (newPage) => {
+    // 🔧 LIMPIAR productos antes de cargar la nueva página
+    setProductos([]);
+    setLoading(true);
+
     obtenerProductos(newPage, searchTerm, filtros);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -213,7 +242,6 @@ function Catalogo() {
           <span>{error}</span>
         </div>
       )}
-
       {/* Barra de búsqueda moderna */}
       <div style={searchSectionStyle}>
         <div style={searchContainerStyle}>
@@ -224,6 +252,7 @@ function Catalogo() {
               placeholder="Buscar productos, categorías..."
               value={searchTerm}
               onChange={handleSearchChange}
+              onKeyPress={handleKeyPress}
               style={searchInputStyle}
             />
             {searchTerm && (
@@ -234,9 +263,17 @@ function Catalogo() {
                 ✕
               </button>
             )}
+            {/* 🆕 BOTÓN DE BÚSQUEDA */}
+            <button
+              onClick={handleSearch}
+              style={searchButtonStyle}
+            >
+              🔍 Buscar
+            </button>
           </div>
         </div>
       </div>
+
 
       {/* Filtros */}
       <ProductFilters
@@ -280,7 +317,7 @@ function Catalogo() {
           <div style={productsGridStyle}>
             {productos.map((producto, index) => (
               <ProductCard
-                key={producto._id}
+                key={`${pagination.currentPage}-${producto._id}`}
                 producto={producto}
                 onAgregar={handleAgregar}
                 index={index}
@@ -344,7 +381,7 @@ function ProductCard({ producto, onAgregar, index, carrito }) {
       <div style={productImageContainerStyle}>
         {!imageLoaded && <div style={imageSkeletonStyle}></div>}
         <img
-          src={producto.imagenUrl || "https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?w=400&h=300&fit=crop"}
+          src={producto.imagenUrl || logoArtMary}
           alt={producto.nombre}
           style={{
             ...productImageStyle,
@@ -445,7 +482,7 @@ function ProductCard({ producto, onAgregar, index, carrito }) {
               return cajasDisponibles > 0;
             })() && (
                 <span style={{ fontSize: '0.75rem', color: '#6b7280', fontStyle: 'italic' }}>
-                  + {(() => {
+                  {(() => {
                     const itemsDelProducto = carrito.filter(item => item._id === producto._id);
                     const unidadesUsadasIndividual = itemsDelProducto
                       .filter(item => item.tipoVenta === 'individual')
@@ -919,7 +956,8 @@ const productCardStyle = {
 const productImageContainerStyle = {
   position: 'relative',
   height: '250px',
-  overflow: 'hidden'
+  overflow: 'hidden',
+  background: 'linear-gradient(135deg, #fef3c7, #fce7f3)' // ← Degradado amarillo a rosa suave
 };
 
 const imageSkeletonStyle = {
@@ -1066,6 +1104,19 @@ const cartIconStyle = {
 const cartTextStyle = {
   fontSize: '0.875rem',
   fontWeight: '600'
+};
+
+const searchButtonStyle = {
+  padding: '1rem 1.5rem',
+  background: 'rgba(139, 92, 246, 0.1)',
+  color: '#8b5cf6',
+  border: '2px solid #8b5cf6',
+  borderRadius: '0 1rem 1rem 0',
+  fontSize: '0.95rem',
+  fontWeight: '600',
+  cursor: 'pointer',
+  transition: 'all 0.3s ease',
+  whiteSpace: 'nowrap'
 };
 
 const cartBadgeStyle = {

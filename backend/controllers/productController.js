@@ -131,17 +131,19 @@ exports.obtenerProductos = async (req, res) => {
         const categoria = req.query.categoria || '';
         const precioMin = req.query.precioMin ? parseFloat(req.query.precioMin) : null;
         const precioMax = req.query.precioMax ? parseFloat(req.query.precioMax) : null;
-        const soloStock = req.query.soloStock === 'true';
-
-        // NUEVO: Filtro por tipo de venta
-        const tipoVenta = req.query.tipoVenta || ''; // 'individual', 'conjunto', 'ambos'
+        const soloStock = req.query.disponibilidad === 'conStock';
+        const tipoVenta = req.query.tipoVenta || '';
 
         const skip = (page - 1) * limit;
 
-        // Construir filtro de búsqueda
+        console.log('📥 Parámetros recibidos:', {
+            page, limit, search, categoria, precioMin, precioMax, soloStock, tipoVenta, sortBy
+        });
+
+        // Construcción del filtro de búsqueda
         let searchFilter = {};
 
-        // Filtro de texto
+        // Filtro de texto (búsqueda)
         if (search) {
             searchFilter.$or = [
                 { nombre: { $regex: search, $options: 'i' } },
@@ -155,14 +157,14 @@ exports.obtenerProductos = async (req, res) => {
             searchFilter.categoria = categoria;
         }
 
-        // Filtro por rango de precios (precio individual)
+        // Filtro por rango de precios
         if (precioMin !== null || precioMax !== null) {
             searchFilter.precioVenta = {};
             if (precioMin !== null) searchFilter.precioVenta.$gte = precioMin;
             if (precioMax !== null) searchFilter.precioVenta.$lte = precioMax;
         }
 
-        // Filtro solo productos con stock
+        // Filtro por disponibilidad (solo con stock)
         if (soloStock) {
             searchFilter.$or = [
                 { stock: { $gt: 0 } },
@@ -170,41 +172,41 @@ exports.obtenerProductos = async (req, res) => {
             ];
         }
 
-        // NUEVO: Filtro por tipo de venta
+        // Filtro por tipo de venta
         if (tipoVenta === 'individual') {
             searchFilter.tieneConjunto = false;
         } else if (tipoVenta === 'conjunto') {
             searchFilter.tieneConjunto = true;
         }
-        // Si es 'ambos' o vacío, no filtrar
 
-        // Opciones de ordenamiento
+        // Opciones de ordenamiento - CON _id COMO CRITERIO SECUNDARIO PARA ESTABILIDAD
         let sortOption = {};
         switch (sortBy) {
-            case 'price_asc':
-                sortOption = { precioVenta: 1 };
+            case 'nombre_asc':
+                sortOption = { nombre: 1, _id: 1 };
                 break;
-            case 'price_desc':
-                sortOption = { precioVenta: -1 };
+            case 'nombre_desc':
+                sortOption = { nombre: -1, _id: 1 };
                 break;
-            case 'name_asc':
-                sortOption = { nombre: 1 };
+            case 'precio_asc':
+                sortOption = { precioVenta: 1, _id: 1 };
                 break;
-            case 'name_desc':
-                sortOption = { nombre: -1 };
+            case 'precio_desc':
+                sortOption = { precioVenta: -1, _id: 1 };
                 break;
             case 'stock_asc':
-                sortOption = { stock: 1 };
+                sortOption = { stock: 1, _id: 1 };
                 break;
             case 'stock_desc':
-                sortOption = { stock: -1 };
+                sortOption = { stock: -1, _id: 1 };
                 break;
             default:
-                sortOption = { createdAt: -1 }; // Más recientes primero
+                sortOption = { createdAt: -1, _id: 1 }; // Más recientes primero, con _id como desempate
                 break;
         }
 
         console.log('🔍 Filtro final construido:', JSON.stringify(searchFilter, null, 2));
+        console.log(`🔍 Búsqueda - Página: ${page}, Skip: ${skip}, Limit: ${limit}`);
 
         // Ejecutar consultas en paralelo para optimizar rendimiento
         const [productos, totalProductos, categorias] = await Promise.all([
@@ -215,6 +217,13 @@ exports.obtenerProductos = async (req, res) => {
             Product.countDocuments(searchFilter),
             Product.distinct('categoria') // Obtener todas las categorías únicas
         ]);
+
+        // 🔧 Verificar si hay duplicados en la respuesta del backend
+        const idsUnicos = new Set(productos.map(p => p._id.toString()));
+        console.log(`✅ Productos encontrados: ${productos.length}, IDs únicos: ${idsUnicos.size}`);
+        if (productos.length !== idsUnicos.size) {
+            console.error('⚠️ ¡DUPLICADOS DETECTADOS EN EL BACKEND!');
+        }
 
         // Calcular información de paginación
         const totalPages = Math.ceil(totalProductos / limit);
@@ -259,6 +268,7 @@ exports.obtenerProductos = async (req, res) => {
         });
     }
 };
+
 
 // Obtener un producto por ID
 exports.obtenerProductoPorId = async (req, res) => {
