@@ -5,7 +5,7 @@ const sgMail = require('@sendgrid/mail');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const sendVerificationEmail = async (email, token, nombre) => {
-  const verificationUrl = `${process.env.FRONTEND_URL}/verificar-email?token=${token}`;
+  const verificationUrl = `${process.env.FRONTEND_URL}/#/verificar-email?token=${token}`;
   
   const msg = {
     to: email,
