@@ -4,10 +4,12 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } = require('../config/emailConfig');
 
-// Registro con verificación por email
+// ✅ REGISTRO CON ENVÍO DE EMAIL NO BLOQUEANTE
 exports.registrarUsuario = async (req, res) => {
   try {
     const { nombre, correo, contraseña } = req.body;
+
+    console.log('📝 Intento de registro para:', correo);
 
     const usuarioExistente = await User.findOne({ correo });
     if (usuarioExistente) {
@@ -31,29 +33,30 @@ exports.registrarUsuario = async (req, res) => {
     });
 
     await nuevoUsuario.save();
+    console.log('✅ Usuario guardado en DB:', correo);
 
-    // Enviar email de verificación
-    try {
-      await sendVerificationEmail(correo, verificationToken, nombre);
-      
-      res.status(201).json({ 
-        mensaje: 'Usuario registrado con éxito. Por favor verifica tu correo electrónico.',
-        requiresVerification: true
-      });
-    } catch (emailError) {
-      console.error('Error enviando email de verificación:', emailError);
-      
-      // Si falla el email, eliminamos el usuario creado
-      await User.findByIdAndDelete(nuevoUsuario._id);
-      
-      res.status(500).json({ 
-        mensaje: 'Error al enviar email de verificación. Intenta registrarte nuevamente.',
-        error: 'EMAIL_SEND_FAILED'
-      });
-    }
+    // ✅ RESPONDER INMEDIATAMENTE AL CLIENTE (SIN ESPERAR EL EMAIL)
+    res.status(201).json({ 
+      mensaje: 'Usuario registrado con éxito. Por favor verifica tu correo electrónico.',
+      requiresVerification: true
+    });
+
+    // 🔄 ENVIAR EMAIL EN SEGUNDO PLANO (NO BLOQUEANTE)
+    // Usamos setImmediate o Promise sin await para no bloquear
+    setImmediate(async () => {
+      try {
+        console.log('📧 Enviando email de verificación a:', correo);
+        await sendVerificationEmail(correo, verificationToken, nombre);
+        console.log('✅ Email de verificación enviado exitosamente a:', correo);
+      } catch (emailError) {
+        console.error('❌ Error enviando email de verificación:', emailError.message);
+        // El usuario ya está creado, solo logueamos el error
+        // Podríamos guardar en DB que el email falló para reintentarlo después
+      }
+    });
 
   } catch (error) {
-    console.error('Error al registrar usuario:', error);
+    console.error('❌ Error al registrar usuario:', error);
     res.status(500).json({ mensaje: 'Error al registrar usuario.', error: error.message });
   }
 };
@@ -79,23 +82,24 @@ exports.verificarEmail = async (req, res) => {
       });
     }
 
-    // Verificar usuario
     usuario.isVerified = true;
     usuario.verificationToken = null;
     usuario.verificationTokenExpires = null;
     await usuario.save();
 
-    // Enviar email de bienvenida
-    try {
-      await sendWelcomeEmail(usuario.correo, usuario.nombre);
-    } catch (emailError) {
-      console.error('Error enviando email de bienvenida:', emailError);
-      // No fallar la verificación si el email de bienvenida falla
-    }
-
     res.status(200).json({ 
       mensaje: 'Email verificado con éxito. Ya puedes iniciar sesión.',
       verified: true
+    });
+
+    // Enviar email de bienvenida en segundo plano
+    setImmediate(async () => {
+      try {
+        await sendWelcomeEmail(usuario.correo, usuario.nombre);
+        console.log('✅ Email de bienvenida enviado a:', usuario.correo);
+      } catch (emailError) {
+        console.error('❌ Error enviando email de bienvenida:', emailError);
+      }
     });
 
   } catch (error) {
@@ -104,10 +108,14 @@ exports.verificarEmail = async (req, res) => {
   }
 };
 
-// Reenviar email de verificación
+// Reenviar verificación
 exports.reenviarVerificacion = async (req, res) => {
   try {
     const { correo } = req.body;
+
+    if (!correo) {
+      return res.status(400).json({ mensaje: 'El correo es requerido.' });
+    }
 
     const usuario = await User.findOne({ correo });
 
@@ -116,7 +124,7 @@ exports.reenviarVerificacion = async (req, res) => {
     }
 
     if (usuario.isVerified) {
-      return res.status(400).json({ mensaje: 'El usuario ya está verificado.' });
+      return res.status(400).json({ mensaje: 'Este correo ya está verificado.' });
     }
 
     // Generar nuevo token
@@ -128,21 +136,21 @@ exports.reenviarVerificacion = async (req, res) => {
     usuario.verificationTokenExpires = tokenExpiration;
     await usuario.save();
 
-    // Reenviar email
-    try {
-      await sendVerificationEmail(correo, verificationToken, usuario.nombre);
-      
-      res.status(200).json({ 
-        mensaje: 'Email de verificación reenviado con éxito.',
-        sent: true
-      });
-    } catch (emailError) {
-      console.error('Error reenviando email:', emailError);
-      res.status(500).json({ 
-        mensaje: 'Error al reenviar email de verificación.',
-        error: 'EMAIL_SEND_FAILED'
-      });
-    }
+    // ✅ RESPONDER INMEDIATAMENTE
+    res.status(200).json({ 
+      mensaje: 'Email de verificación reenviado. Revisa tu bandeja de entrada.',
+      sent: true
+    });
+
+    // 🔄 ENVIAR EMAIL EN SEGUNDO PLANO
+    setImmediate(async () => {
+      try {
+        await sendVerificationEmail(correo, verificationToken, usuario.nombre);
+        console.log('✅ Email de verificación reenviado a:', correo);
+      } catch (emailError) {
+        console.error('❌ Error reenviando email:', emailError);
+      }
+    });
 
   } catch (error) {
     console.error('Error al reenviar verificación:', error);
@@ -150,7 +158,7 @@ exports.reenviarVerificacion = async (req, res) => {
   }
 };
 
-// NUEVA FUNCIÓN: Solicitar restablecimiento de contraseña
+// Solicitar restablecimiento de contraseña
 exports.solicitarRestablecimiento = async (req, res) => {
   try {
     const { correo } = req.body;
@@ -185,21 +193,21 @@ exports.solicitarRestablecimiento = async (req, res) => {
     usuario.passwordResetExpires = tokenExpiration;
     await usuario.save();
 
-    // Enviar email de restablecimiento
-    try {
-      await sendPasswordResetEmail(correo, resetToken, usuario.nombre);
-      
-      res.status(200).json({ 
-        mensaje: 'Si el correo existe en nuestro sistema, recibirás un email con instrucciones.',
-        sent: true
-      });
-    } catch (emailError) {
-      console.error('Error enviando email de restablecimiento:', emailError);
-      res.status(500).json({ 
-        mensaje: 'Error al enviar email de restablecimiento.',
-        error: 'EMAIL_SEND_FAILED'
-      });
-    }
+    // ✅ RESPONDER INMEDIATAMENTE
+    res.status(200).json({ 
+      mensaje: 'Si el correo existe en nuestro sistema, recibirás un email con instrucciones.',
+      sent: true
+    });
+
+    // 🔄 ENVIAR EMAIL EN SEGUNDO PLANO
+    setImmediate(async () => {
+      try {
+        await sendPasswordResetEmail(correo, resetToken, usuario.nombre);
+        console.log('✅ Email de restablecimiento enviado a:', correo);
+      } catch (emailError) {
+        console.error('❌ Error enviando email de restablecimiento:', emailError);
+      }
+    });
 
   } catch (error) {
     console.error('Error al solicitar restablecimiento:', error);
@@ -207,7 +215,7 @@ exports.solicitarRestablecimiento = async (req, res) => {
   }
 };
 
-// NUEVA FUNCIÓN: Restablecer contraseña
+// Restablecer contraseña
 exports.restablecerContrasena = async (req, res) => {
   try {
     const { token } = req.query;
@@ -256,15 +264,13 @@ exports.iniciarSesion = async (req, res) => {
   try {
     const { correo, contraseña } = req.body;
 
-    console.log('REQ BODY:', req.body);
+    console.log('🔐 Intento de login para:', correo);
 
     const usuario = await User.findOne({ correo });
 
     if (!usuario) {
       return res.status(404).json({ mensaje: 'Correo no registrado.' });
     }
-
-    console.log('Usuario encontrado:', usuario);
 
     // Verificar si el email está verificado
     if (!usuario.isVerified) {
@@ -286,6 +292,8 @@ exports.iniciarSesion = async (req, res) => {
       { expiresIn: '2h' }
     );
 
+    console.log('✅ Login exitoso para:', correo);
+
     res.status(200).json({
       mensaje: 'Inicio de sesión exitoso',
       token,
@@ -298,7 +306,7 @@ exports.iniciarSesion = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error en login:', error);
+    console.error('❌ Error en login:', error);
     res.status(500).json({ mensaje: 'Error al iniciar sesión.', error: error.message });
   }
 };
