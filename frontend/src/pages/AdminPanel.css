@@ -69,10 +69,6 @@
     gap: 1.5rem !important;
   }
 
-  .graficas-container {
-    grid-template-columns: 1fr !important;
-    gap: 1.5rem !important;
-  }
 
   .filtros-container-redesigned {
     grid-template-columns: 1fr !important;
@@ -937,10 +933,6 @@
     gap: 1.5rem !important;
   }
 
-  .graficas-container {
-    grid-template-columns: 1fr !important;
-    gap: 1.5rem !important;
-  }
 
   .filtros-container-redesigned {
     grid-template-columns: 1fr !important;
@@ -1101,18 +1093,75 @@
   color: var(--primary-700);
 }
 
-.graficas-container {
+/* Graficas mejoradas con fondo blanco */
+.graficas-container-mejoradas {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 2rem;
+  margin-top: 2rem;
+  background: transparent;
 }
 
-.grafica-card {
+.grafica-card-grande {
   background: white;
-  border-radius: 1rem;
+  border-radius: 20px;
   padding: 2rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: 1px solid var(--neutral-200);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 2px solid #e5e7eb;
+}
+
+.grafica-card-grande:nth-child(1),
+.grafica-card-grande:nth-child(2) {
+  grid-column: span 2;
+}
+
+.analisis-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: white;
+}
+
+.analisis-title span {
+  font-size: 1.5rem;
+}
+
+/* Asegurar que el contenedor de la grafica tenga fondo blanco */
+.grafica-card-grande > div {
+  background: white !important;
+}
+
+/* Estilos para el contenedor de estadisticas */
+.estadisticas-container-redesigned {
+  background: white;
+  border-radius: 20px;
+  padding: 2rem;
+  margin: 2rem 0;
+}
+
+@media (max-width: 1400px) {
+  .graficas-container-mejoradas {
+    grid-template-columns: 1fr;
+  }
+  
+  .grafica-card-grande:nth-child(1),
+  .grafica-card-grande:nth-child(2) {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .grafica-card-grande {
+    padding: 1rem;
+  }
+  
+  .analisis-title {
+    font-size: 1rem;
+  }
 }
 
 /* Información de cliente y pedido */
@@ -1602,4 +1651,99 @@
 
 .search-button:active {
   transform: scale(0.98);
+}
+
+/* Navegacion de fecha en Estadisticas Avanzadas */
+.navegacion-fecha-estadisticas {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.btn-nav-estadisticas {
+  padding: 0.7rem 1.3rem;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  white-space: nowrap;
+}
+
+.btn-nav-estadisticas:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.btn-hoy-estadisticas {
+  padding: 0.7rem 1.3rem;
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 12px rgba(245, 87, 108, 0.3);
+  white-space: nowrap;
+}
+
+.btn-hoy-estadisticas:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(245, 87, 108, 0.4);
+}
+
+.date-picker-estadisticas {
+  padding: 0.7rem 1.2rem;
+  border: 2px solid rgba(102, 126, 234, 0.3);
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #667eea;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 180px;
+  grid-column: 2;
+}
+
+.date-picker-estadisticas:hover {
+  border-color: rgba(102, 126, 234, 0.6);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.date-picker-estadisticas:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.fecha-actual-estadisticas {
+  display: none;
+}
+
+@media (max-width: 992px) {
+  .navegacion-fecha-estadisticas {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+  }
+  
+  .date-picker-estadisticas {
+    grid-column: auto;
+    width: 100%;
+  }
+  
+  .btn-nav-estadisticas,
+  .btn-hoy-estadisticas {
+    width: 100%;
+  }
 }

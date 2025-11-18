@@ -60,10 +60,14 @@ function MisPedidos() {
         // 🔧 CÁLCULO COMPLETAMENTE CORREGIDO PARA CONJUNTOS
         const unidadesPorConjunto = Number(item.unidadesPorConjunto) || 1;
 
-        // ✅ CLAVE: En el backend, para conjuntos, 'cantidad' representa el NÚMERO DE CAJAS/CONJUNTOS
-        // NO las unidades totales como pensábamos antes
-        const cantidadConjuntos = Number(item.cantidad) || 0; // ← Esta es la cantidad de CAJAS
-        const cantidadTotal = cantidadConjuntos * unidadesPorConjunto; // ← Estas son las UNIDADES TOTALES
+        // ✅ CORRECCIÓN: Usar cantidadOriginal si existe, si no, calcular desde cantidad total
+        const cantidadConjuntos = item.cantidadOriginal ?
+          Number(item.cantidadOriginal) :
+          Math.floor(Number(item.cantidad) / unidadesPorConjunto);
+
+        const cantidadTotal = item.cantidadOriginal ?
+          cantidadConjuntos * unidadesPorConjunto :
+          Number(item.cantidad);
 
         console.log(`📦 Conjunto detectado:`, {
           nombre: item.nombre,

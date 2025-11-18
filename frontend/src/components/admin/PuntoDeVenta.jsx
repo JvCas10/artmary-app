@@ -246,7 +246,7 @@ function PuntoDeVenta({
 
       await onVentaRegistrada(ventaData);
       vaciarCarrito();
-      setMensaje('✅ Venta registrada exitosamente');
+      setMensaje('Venta registrada exitosamente');
       setTimeout(() => setMensaje(''), 5000);
     } catch (error) {
       console.error('Error al procesar venta:', error);

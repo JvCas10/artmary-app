@@ -350,32 +350,92 @@ function AdminPanel() {
     return [...ventasFisicas, ...pedidosEntregados].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
   };
 
+  // Función para obtener la etiqueta del período seleccionado
+  const obtenerEtiquetaPeriodo = () => {
+    const fecha = new Date(fechaSeleccionada);
+
+    switch (filtroTemporal) {
+      case 'dia':
+        return fecha.toLocaleDateString('es-ES', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      case 'semana':
+        const diaSemana = fecha.getDay();
+        const inicioSemana = new Date(fecha);
+        inicioSemana.setDate(fecha.getDate() - diaSemana);
+        const finSemana = new Date(inicioSemana);
+        finSemana.setDate(inicioSemana.getDate() + 6);
+        return `${inicioSemana.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - ${finSemana.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+      case 'mes':
+        return fecha.toLocaleDateString('es-ES', {
+          year: 'numeric',
+          month: 'long'
+        });
+      default:
+        return '';
+    }
+  };
+
+  // Función para cambiar período (anterior/siguiente)
+  const cambiarPeriodo = (direccion) => {
+    const fecha = new Date(fechaSeleccionada);
+
+    switch (filtroTemporal) {
+      case 'dia':
+        fecha.setDate(fecha.getDate() + direccion);
+        break;
+      case 'semana':
+        fecha.setDate(fecha.getDate() + (direccion * 7));
+        break;
+      case 'mes':
+        fecha.setMonth(fecha.getMonth() + direccion);
+        break;
+    }
+
+    setFechaSeleccionada(fecha);
+  };
+
+  // Función para ir a hoy
+  const irAHoy = () => {
+    setFechaSeleccionada(new Date());
+  };
+
   // Función para obtener ventas filtradas por período temporal
   const obtenerVentasFiltradas = () => {
     const todasLasVentas = obtenerTodasLasVentas();
-    const hoy = new Date();
-    const inicioDelDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-    const inicioDelaSemana = new Date(hoy.setDate(hoy.getDate() - hoy.getDay()));
-    const inicioDelMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const fecha = new Date(fechaSeleccionada);
 
-    let fechaInicio;
+    let fechaInicio, fechaFin;
+
     switch (filtroTemporal) {
       case 'dia':
-        fechaInicio = inicioDelDia;
+        fechaInicio = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate(), 0, 0, 0);
+        fechaFin = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate(), 23, 59, 59);
         break;
       case 'semana':
-        fechaInicio = inicioDelaSemana;
+        const diaSemana = fecha.getDay();
+        fechaInicio = new Date(fecha);
+        fechaInicio.setDate(fecha.getDate() - diaSemana);
+        fechaInicio.setHours(0, 0, 0, 0);
+        fechaFin = new Date(fechaInicio);
+        fechaFin.setDate(fechaInicio.getDate() + 6);
+        fechaFin.setHours(23, 59, 59, 999);
         break;
       case 'mes':
-        fechaInicio = inicioDelMes;
+        fechaInicio = new Date(fecha.getFullYear(), fecha.getMonth(), 1, 0, 0, 0);
+        fechaFin = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0, 23, 59, 59);
         break;
       default:
-        fechaInicio = inicioDelMes;
+        fechaInicio = new Date(fecha.getFullYear(), fecha.getMonth(), 1);
+        fechaFin = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0, 23, 59, 59);
     }
 
     return todasLasVentas.filter(venta => {
       const fechaVenta = new Date(venta.fecha);
-      return fechaVenta >= fechaInicio;
+      return fechaVenta >= fechaInicio && fechaVenta <= fechaFin;
     });
   };
 
@@ -481,7 +541,7 @@ function AdminPanel() {
 
   return (
     <div className="admin-page-wrapper">
-      <br/><br/>
+      <br /><br />
       {/* Hero Header */}
       <div className="hero-header">
         <div className="hero-content">
@@ -715,7 +775,7 @@ function AdminPanel() {
                     <button
                       onClick={() => {
                         setProductSearchTerm('');
-                              }}
+                      }}
                       className="clear-search"
                     >
                       ✕
@@ -1066,6 +1126,69 @@ function AdminPanel() {
                     </div>
                   </div>
                 </div>
+                <div className="filtros-grupo-redesigned">
+                    <label className="label-filtro-redesigned">Seleccionar Periodo</label>
+                    <div className="navegacion-fecha-estadisticas">
+                      <button 
+                        onClick={() => cambiarPeriodo(-1)} 
+                        className="btn-nav-estadisticas"
+                      >
+                        ◀ Anterior
+                      </button>
+                      
+                      {filtroTemporal === 'dia' && (
+                        <input
+                          type="date"
+                          value={fechaSeleccionada.toISOString().split('T')[0]}
+                          onChange={(e) => setFechaSeleccionada(new Date(e.target.value))}
+                          className="date-picker-estadisticas"
+                        />
+                      )}
+                      
+                      {filtroTemporal === 'semana' && (
+                        <input
+                          type="week"
+                          value={`${fechaSeleccionada.getFullYear()}-W${String(Math.ceil((fechaSeleccionada.getDate() + 6 - fechaSeleccionada.getDay()) / 7)).padStart(2, '0')}`}
+                          onChange={(e) => {
+                            const [year, week] = e.target.value.split('-W');
+                            const date = new Date(year, 0, 1 + (week - 1) * 7);
+                            setFechaSeleccionada(date);
+                          }}
+                          className="date-picker-estadisticas"
+                        />
+                      )}
+                      
+                      {filtroTemporal === 'mes' && (
+                        <input
+                          type="month"
+                          value={`${fechaSeleccionada.getFullYear()}-${String(fechaSeleccionada.getMonth() + 1).padStart(2, '0')}`}
+                          onChange={(e) => {
+                            const [year, month] = e.target.value.split('-');
+                            setFechaSeleccionada(new Date(year, month - 1, 1));
+                          }}
+                          className="date-picker-estadisticas"
+                        />
+                      )}
+                      
+                      <div className="fecha-actual-estadisticas">
+                        {obtenerEtiquetaPeriodo()}
+                      </div>
+                      
+                      <button 
+                        onClick={() => cambiarPeriodo(1)} 
+                        className="btn-nav-estadisticas"
+                      >
+                        Siguiente ▶
+                      </button>
+                      
+                      <button 
+                        onClick={irAHoy} 
+                        className="btn-hoy-estadisticas"
+                      >
+                        📍 Hoy
+                      </button>
+                    </div>
+                  </div>
               </div>
 
               {/* Tabla de estadísticas detalladas */}
@@ -1129,58 +1252,281 @@ function AdminPanel() {
                 </div>
               </div>
 
-              {/* Gráficas */}
-              <div className="graficas-container">
-                <div className="grafica-card">
+             {/* Gráficas Útiles */}
+              <div className="graficas-container-mejoradas">
+                
+                {/* Gráfica 1: Ingresos vs Ganancias - GRANDE */}
+                <div className="grafica-card-grande">
                   <h3 className="analisis-title">
-                    <span>📈</span>
-                    Tendencia de Ventas (Últimos 7 días)
+                    <span>💰</span>
+                    Ingresos Brutos vs Ganancias Netas - Últimos 15 Días
                   </h3>
-                  <div style={{ width: '100%', height: '300px' }}>
+                  <div style={{ width: '100%', height: '400px' }}>
                     <ResponsiveContainer>
-                      <LineChart data={obtenerDatosGrafica()}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="fecha" />
-                        <YAxis />
-                        <Tooltip />
-                        <Line
-                          type="monotone"
-                          dataKey="ventas"
-                          stroke="#8884d8"
-                          strokeWidth={3}
+                      <AreaChart data={(() => {
+                        const ultimas15Ventas = obtenerTodasLasVentas()
+                          .filter(v => {
+                            const fechaVenta = new Date(v.fecha);
+                            const hace15Dias = new Date();
+                            hace15Dias.setDate(hace15Dias.getDate() - 15);
+                            return fechaVenta >= hace15Dias;
+                          })
+                          .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+                        
+                        const datosPorDia = {};
+                        ultimas15Ventas.forEach(venta => {
+                          const fecha = new Date(venta.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+                          if (!datosPorDia[fecha]) {
+                            datosPorDia[fecha] = { ingresos: 0, ganancias: 0 };
+                          }
+                          datosPorDia[fecha].ingresos += venta.total || 0;
+                          datosPorDia[fecha].ganancias += venta.gananciaTotal || 0;
+                        });
+                        
+                        return Object.entries(datosPorDia).map(([fecha, datos]) => ({
+                          fecha,
+                          ingresos: datos.ingresos,
+                          ganancias: datos.ganancias
+                        }));
+                      })()}>
+                        <defs>
+                          <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#667eea" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#667eea" stopOpacity={0.1}/>
+                          </linearGradient>
+                          <linearGradient id="colorGanancias" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis 
+                          dataKey="fecha" 
+                          style={{ fontSize: '14px' }}
                         />
-                      </LineChart>
+                        <YAxis 
+                          style={{ fontSize: '14px' }}
+                          tickFormatter={(value) => `Q${value}`}
+                        />
+                        <Tooltip 
+                          formatter={(value) => `Q${value.toFixed(2)}`}
+                          contentStyle={{ borderRadius: '8px', border: '2px solid #e5e7eb' }}
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="ingresos" 
+                          stroke="#667eea" 
+                          strokeWidth={3}
+                          fillOpacity={1} 
+                          fill="url(#colorIngresos)"
+                          name="Ingresos Brutos"
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="ganancias" 
+                          stroke="#10b981" 
+                          strokeWidth={3}
+                          fillOpacity={1} 
+                          fill="url(#colorGanancias)"
+                          name="Ganancias Netas"
+                        />
+                      </AreaChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
-                <div className="grafica-card">
+                {/* Gráfica 2: Top 5 Productos Más Vendidos - GRANDE */}
+                <div className="grafica-card-grande">
                   <h3 className="analisis-title">
-                    <span>📊</span>
-                    Distribución de Productos
+                    <span>🏆</span>
+                    Top 5 Productos Más Vendidos (Unidades)
                   </h3>
-                  <div style={{ width: '100%', height: '300px' }}>
+                  <div style={{ width: '100%', height: '400px' }}>
                     <ResponsiveContainer>
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: 'En Stock', value: estadisticas.productosEnStock },
-                            { name: 'Sin Stock', value: estadisticas.productosSinStock }
-                          ]}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          <Cell fill="#22c55e" />
-                          <Cell fill="#ef4444" />
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
+                      <BarChart 
+                        data={(() => {
+                          const ventasPorProducto = {};
+                          obtenerVentasFiltradas().forEach(venta => {
+                            venta.productos.forEach(prod => {
+                              const key = prod.nombre;
+                              if (!ventasPorProducto[key]) {
+                                ventasPorProducto[key] = {
+                                  nombre: prod.nombre,
+                                  unidades: 0,
+                                  ingresos: 0
+                                };
+                              }
+                              ventasPorProducto[key].unidades += prod.cantidad || 0;
+                              ventasPorProducto[key].ingresos += (prod.precioVenta || 0) * (prod.cantidad || 0);
+                            });
+                          });
+                          
+                          return Object.values(ventasPorProducto)
+                            .sort((a, b) => b.unidades - a.unidades)
+                            .slice(0, 5)
+                            .map(p => ({
+                              ...p,
+                              nombreCorto: p.nombre.length > 25 ? p.nombre.substring(0, 25) + '...' : p.nombre
+                            }));
+                        })()}
+                        layout="vertical"
+                        margin={{ left: 150, right: 30, top: 20, bottom: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis type="number" style={{ fontSize: '14px' }} />
+                        <YAxis 
+                          type="category" 
+                          dataKey="nombreCorto" 
+                          width={140}
+                          style={{ fontSize: '13px' }}
+                        />
+                        <Tooltip 
+                          formatter={(value, name, props) => {
+                            if (name === 'unidades') return [`${value} unidades vendidas`, 'Unidades'];
+                            return [`Q${value.toFixed(2)}`, 'Ingresos'];
+                          }}
+                          contentStyle={{ borderRadius: '8px', border: '2px solid #e5e7eb' }}
+                          labelFormatter={(label) => {
+                            const producto = (() => {
+                              const ventasPorProducto = {};
+                              obtenerVentasFiltradas().forEach(venta => {
+                                venta.productos.forEach(prod => {
+                                  const key = prod.nombre;
+                                  if (!ventasPorProducto[key]) {
+                                    ventasPorProducto[key] = { nombre: prod.nombre, unidades: 0 };
+                                  }
+                                  ventasPorProducto[key].unidades += prod.cantidad || 0;
+                                });
+                              });
+                              return Object.values(ventasPorProducto)
+                                .sort((a, b) => b.unidades - a.unidades)
+                                .slice(0, 5)
+                                .find(p => p.nombre.startsWith(label.replace('...', '')));
+                            })();
+                            return producto ? producto.nombre : label;
+                          }}
+                        />
+                        <Bar dataKey="unidades" fill="#667eea" name="Unidades" radius={[0, 8, 8, 0]} />
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
+
+                {/* Gráfica 3: Top 5 Productos por Ganancia - GRANDE */}
+                <div className="grafica-card-grande">
+                  <h3 className="analisis-title">
+                    <span>💎</span>
+                    Top 5 Productos Más Rentables (Ganancia)
+                  </h3>
+                  <div style={{ width: '100%', height: '400px' }}>
+                    <ResponsiveContainer>
+                      <BarChart 
+                        data={(() => {
+                          const gananciasPorProducto = {};
+                          obtenerVentasFiltradas().forEach(venta => {
+                            venta.productos.forEach(prod => {
+                              const key = prod.nombre;
+                              if (!gananciasPorProducto[key]) {
+                                gananciasPorProducto[key] = {
+                                  nombre: prod.nombre,
+                                  ganancia: 0,
+                                  unidades: 0
+                                };
+                              }
+                              const gananciaUnitaria = (prod.precioVenta || 0) - (prod.precioCompra || 0);
+                              gananciasPorProducto[key].ganancia += gananciaUnitaria * (prod.cantidad || 0);
+                              gananciasPorProducto[key].unidades += prod.cantidad || 0;
+                            });
+                          });
+                          
+                          return Object.values(gananciasPorProducto)
+                            .sort((a, b) => b.ganancia - a.ganancia)
+                            .slice(0, 5)
+                            .map(p => ({
+                              ...p,
+                              nombreCorto: p.nombre.length > 25 ? p.nombre.substring(0, 25) + '...' : p.nombre
+                            }));
+                        })()}
+                        layout="vertical"
+                        margin={{ left: 150, right: 30, top: 20, bottom: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis type="number" style={{ fontSize: '14px' }} />
+                        <YAxis 
+                          type="category" 
+                          dataKey="nombreCorto" 
+                          width={140}
+                          style={{ fontSize: '13px' }}
+                        />
+                        <Tooltip 
+                          formatter={(value) => [`Q${value.toFixed(2)}`, 'Ganancia']}
+                          contentStyle={{ borderRadius: '8px', border: '2px solid #e5e7eb' }}
+                        />
+                        <Bar dataKey="ganancia" fill="#10b981" name="Ganancia" radius={[0, 8, 8, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Gráfica 4: Comparación del Período Actual */}
+                <div className="grafica-card-grande">
+                  <h3 className="analisis-title">
+                    <span>📊</span>
+                    Comparación del Período Actual
+                  </h3>
+                  <div style={{ width: '100%', height: '400px' }}>
+                    <ResponsiveContainer>
+                      <BarChart data={[
+                        {
+                          metrica: 'Ingresos Brutos',
+                          valor: estadisticas.ingresosBrutos
+                        },
+                        {
+                          metrica: 'Ganancias Netas',
+                          valor: estadisticas.gananciasTotal
+                        },
+                        {
+                          metrica: 'Unidades Vendidas',
+                          valor: estadisticas.productosVendidos
+                        },
+                        {
+                          metrica: 'Conjuntos Vendidos',
+                          valor: estadisticas.totalConjuntosVendidos
+                        }
+                      ]}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis 
+                          dataKey="metrica" 
+                          style={{ fontSize: '14px' }}
+                          angle={-15}
+                          textAnchor="end"
+                          height={80}
+                        />
+                        <YAxis style={{ fontSize: '14px' }} />
+                        <Tooltip 
+                          formatter={(value, name, props) => {
+                            if (props.payload.metrica.includes('Ingresos') || props.payload.metrica.includes('Ganancias')) {
+                              return [`Q${value.toFixed(2)}`, props.payload.metrica];
+                            }
+                            return [`${value}`, props.payload.metrica];
+                          }}
+                          contentStyle={{ borderRadius: '8px', border: '2px solid #e5e7eb' }}
+                        />
+                        <Bar dataKey="valor" radius={[8, 8, 0, 0]}>
+                          {[
+                            { metrica: 'Ingresos Brutos', valor: estadisticas.ingresosBrutos },
+                            { metrica: 'Ganancias Netas', valor: estadisticas.gananciasTotal },
+                            { metrica: 'Unidades Vendidas', valor: estadisticas.productosVendidos },
+                            { metrica: 'Conjuntos Vendidos', valor: estadisticas.totalConjuntosVendidos }
+                          ].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={['#667eea', '#10b981', '#f59e0b', '#ec4899'][index]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>
